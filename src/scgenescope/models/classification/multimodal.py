@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import Any
 import itertools
 from typing import Callable, Iterable
 import torch
@@ -212,7 +213,7 @@ class MultiModalMultipleInputClassifier(LitClassifier):
         x = torch.cat(xs, dim=1)
         return self.classify(x)
 
-    def unpack_batch(self, batch: torch.Any) -> tuple[torch.Tensor, torch.Tensor]:
+    def unpack_batch(self, batch: Any) -> tuple[torch.Tensor, torch.Tensor]:
         # *xs, y = batch
         try:
             y = batch.pop("condition")
