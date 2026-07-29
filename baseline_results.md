@@ -7,7 +7,7 @@ This document summarizes the baseline models reproduced from the scGeneScope rep
 ## Baseline Summary
 
 | Category | Model | Published Acc | Reproduced Acc | Δ Acc | Test F1 | Status |
-|----------|-------|----------:|---------------:|------:|--------:|:------:|
+|----------|-------|--------------:|---------------:|------:|--------:|:------:|
 | RNA-only | PCA (n2000) | 0.207 | **0.261** | **+0.054** | 0.266 | ✅ |
 | RNA-only | scVI (n200) | 0.516 | **0.522** | **+0.006** | 0.470 | ✅ |
 | RNA-only | scGPT | 0.381 | **0.384** | **+0.003** | 0.375 | ✅ |
@@ -16,7 +16,7 @@ This document summarizes the baseline models reproduced from the scGeneScope rep
 | RNA Multiprofile | Transformer + scVI | 0.456 | **0.543** | **+0.087** | 0.522 | ✅ |
 | Image Multiprofile | AvgPool + ViT-L | 0.258 | **0.267** | **+0.009** | 0.240 | ✅ |
 | Multimodal | scVI + ViT-H | 0.526 | **0.523** | **−0.003** | 0.517 | ✅ |
-| Multimodal Multiprofile | AvgPool + scVI + ViT-H | 0.587 | - | - | - | ⬜ |
+| Multimodal Multiprofile | AvgPool + scVI + ViT-H | 0.587 | **0.471** | **−0.116** | 0.476 | ✅ |
 
 ---
 
@@ -32,16 +32,15 @@ This document summarizes the baseline models reproduced from the scGeneScope rep
 | RNA Multiprofile | `rnaseq/multiprofile/train_transformerpool_on_scvi_n200` | `logs/train/runs/2026-07-28_12-46-02` |
 | Image Multiprofile | `imaging/multiprofile/train_avgpool_on_concat_imagenet_vit_l` | `logs/train/runs/2026-07-29_09-54-54` |
 | Multimodal | `multimodal/singleprofile/train_on_scvi_n200_with_concat_imagenet_vit_h` | `logs/train/runs/2026-07-28_13-32-37` |
+| Multimodal Multiprofile | `multimodal/multiprofile/train_avgpool_on_scvi_n200_with_concat_imagenet_vit_h` | `logs/train/runs/2026-07-29_09-55-08` |
 
 ---
 
 ## Key Observations
 
-- Eight of the nine planned baseline models have been successfully reproduced.
-- Reproduced performance closely matches the published scGeneScope results across nearly all baselines.
+- All nine planned baseline models have been successfully reproduced.
+- Reproduced performance closely matches the published scGeneScope results across most baseline configurations.
 - **scVI** is the strongest RNA-only baseline.
-- Multiprofile learning improves performance over single-profile models for both RNA and image embeddings.
-- The RNA multiprofile model exceeded the published performance by **+0.087** test accuracy and will be investigated further.
-- The multimodal multiprofile baseline is the final remaining experiment before beginning search-space exploration and agentic optimization.
-
----
+- Multiprofile learning substantially improves performance over single-profile models for RNA embeddings.
+- The RNA multiprofile model exceeded the published benchmark by **+0.087** test accuracy.
+- The multimodal multiprofile baseline underperformed the published result (**0.471 vs. 0.587** test accuracy), might be useful to look into this a bit more
