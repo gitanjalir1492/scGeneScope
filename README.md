@@ -2,10 +2,27 @@
 
 scGeneScope: A Perturbationally-Paired Single Cell Imaging and Transcriptomics Dataset and Benchmark for Treatment Response Modeling
 
+## Internship Extension
+
+This fork extends the original scGeneScope repository for an internship
+project on automated multimodal model exploration.
+
+Current additions include:
+
+- reproduction of nine representative scGeneScope baselines
+- consolidated benchmark results in `baseline_results.md`
+- a constrained Hydra-compatible search space
+- reproducible random-search experiment sampling
+- an experiment runner for executing and tracking model configurations
+
+Search tooling is located in:
+
+```text
+experiments/search/
 
 ## Installation
 
-1. Install poetry 1.8.5 
+1. Install poetry 1.8.5
 
 ```shell
 curl -sSL https://install.python-poetry.org | python3 - --version 1.8.5
@@ -18,7 +35,7 @@ git clone git@github.com:altoslabs/scGeneScope.git
 cd scGeneScope
 ```
 
-3. Installation with poetry native virtual environment 
+3. Installation with poetry native virtual environment
 
 Make sure python 3.11 is available in your PATH (system dependent)
 
@@ -66,7 +83,7 @@ Available embeddings:
 - features/imaging/imagenet/openphenom
 
 
-3. Download the original imaging and scRNAseq data. 
+3. Download the original imaging and scRNAseq data.
 Note -- all paper results and scGeneScope operations and results can be generated from the precomputed embeddings above. Users can download the original imaging and scRNAseq data to generate new embeddings or run new experiments on the raw data.
 
 To download the scRNAseq data (~80G), run:
@@ -114,18 +131,14 @@ Below we describe potential workflows to use the configuration system to scale y
 ```python
 train trainer.max_epoch=100 model.classifier.hidden_dim=1024 model.classifier.depth=5
 ```
-This command overrides the `cfg.trainer.max_epoch` value and sets it to `100`, overrides `cfg.model.classifier.hidden_dim` value and sets it to `1024` and , overrides `cfg.model.classifier.depth` value and sets it to `5` 
+This command overrides the `cfg.trainer.max_epoch` value and sets it to `100`, overrides `cfg.model.classifier.hidden_dim` value and sets it to `1024` and , overrides `cfg.model.classifier.depth` value and sets it to `5`
 
 2) Add any additional parameters that were not defined in the configuration system
 ```python
 python train.py +trainer.max_steps=5000
-``` 
+```
 This will add an attribute field `gradient_clip_val` to the trainer.
 
 ## Acknowledgments
 
 Some of the hydra configs and utility functions are inspired from the lightning-hydra-template repo ([https://github.com/ashleve/lightning-hydra-template](https://github.com/ashleve/lightning-hydra-template)).
-
-
-
-
