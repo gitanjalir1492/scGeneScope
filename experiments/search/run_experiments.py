@@ -35,6 +35,7 @@ FIELDNAMES = [
     "val_f1",
     "test_accuracy",
     "test_f1",
+    "selection_reason",
     "experiment_summary",
     "started_at",
     "finished_at",
@@ -46,8 +47,6 @@ FIELDNAMES = [
 
 
 def read_results() -> list[dict[str, str]]:
-    """Read the shared experiment results file."""
-
     if not RESULTS_PATH.exists():
         raise FileNotFoundError(
             f"Results file does not exist: {RESULTS_PATH}"
@@ -68,8 +67,6 @@ def read_results() -> list[dict[str, str]]:
 
 
 def write_results(rows: list[dict[str, str]]) -> None:
-    """Save the current experiment records."""
-
     with RESULTS_PATH.open(
         "w",
         newline="",
@@ -110,8 +107,6 @@ def run_experiment(
     rows: list[dict[str, str]],
     python_executable: str,
 ) -> None:
-    """Run one planned experiment and record whether it succeeded."""
-
     LOG_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
     experiment_id = row["experiment_id"]
@@ -248,6 +243,12 @@ def main() -> None:
         f"{row['profile_setting']}"
     )
     print(f"Experiment: {row['experiment']}")
+
+    selection_reason = row.get("selection_reason", "").strip()
+
+    if selection_reason:
+        print(f"Selection reason: {selection_reason}")
+
     print("\nCommand that will be executed:\n")
     print(subprocess.list2cmdline(command))
 

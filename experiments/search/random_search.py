@@ -31,6 +31,7 @@ FIELDNAMES = [
     "val_f1",
     "test_accuracy",
     "test_f1",
+    "selection_reason",
     "experiment_summary",
     "started_at",
     "finished_at",
@@ -76,7 +77,9 @@ def write_rows(rows: list[dict[str, str]]) -> None:
         writer.writerows(rows)
 
 
-def configuration_key(config: dict[str, Any]) -> tuple[Any, ...]:
+def configuration_key(
+    config: dict[str, Any],
+) -> tuple[Any, ...]:
     return (
         config["model_setting"],
         config["profile_setting"],
@@ -87,7 +90,9 @@ def configuration_key(config: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
-def row_key(row: dict[str, str]) -> tuple[Any, ...]:
+def row_key(
+    row: dict[str, str],
+) -> tuple[Any, ...]:
     return (
         row.get("model_setting") or None,
         row.get("profile_setting") or None,
@@ -143,6 +148,7 @@ def make_result_row(
         "val_f1": "",
         "test_accuracy": "",
         "test_f1": "",
+        "selection_reason": "",
         "experiment_summary": "",
         "started_at": "",
         "finished_at": "",

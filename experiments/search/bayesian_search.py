@@ -28,6 +28,7 @@ FIELDNAMES = [
     "val_f1",
     "test_accuracy",
     "test_f1",
+    "selection_reason",
     "experiment_summary",
     "started_at",
     "finished_at",
@@ -203,9 +204,7 @@ def suggest_configuration(
 ) -> tuple[str, dict[str, Any], int]:
     try:
         import optuna
-        from optuna.distributions import (
-            CategoricalDistribution,
-        )
+        from optuna.distributions import CategoricalDistribution
         from optuna.trial import create_trial
     except ImportError as error:
         raise RuntimeError(
@@ -316,6 +315,7 @@ def make_result_row(
         "val_f1": "",
         "test_accuracy": "",
         "test_f1": "",
+        "selection_reason": "",
         "experiment_summary": "",
         "started_at": "",
         "finished_at": "",
@@ -389,12 +389,8 @@ def main() -> None:
         f"{config['profile_setting']}"
     )
     print(f"Configuration: {config}")
-    print(
-        f"Experiment: {result_row['experiment']}"
-    )
-    print(
-        f"Added as: {result_row['experiment_id']}"
-    )
+    print(f"Experiment: {result_row['experiment']}")
+    print(f"Added as: {result_row['experiment_id']}")
     print(f"\nResults file:\n{RESULTS_PATH}")
 
 
