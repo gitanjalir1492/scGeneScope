@@ -19,6 +19,7 @@ TRAIN_SCRIPT = (
 
 RESULTS_PATH = SEARCH_DIRECTORY / "master_results.csv"
 LOG_DIRECTORY = SEARCH_DIRECTORY / "logs"
+RUN_DIRECTORY = SEARCH_DIRECTORY / "runs"
 
 FIELDNAMES = [
     "experiment_id",
@@ -66,7 +67,9 @@ def read_results() -> list[dict[str, str]]:
     return rows
 
 
-def write_results(rows: list[dict[str, str]]) -> None:
+def write_results(
+    rows: list[dict[str, str]],
+) -> None:
     with RESULTS_PATH.open(
         "w",
         newline="",
@@ -84,11 +87,14 @@ def write_results(rows: list[dict[str, str]]) -> None:
 def build_command(
     experiment: str,
     python_executable: str,
+    run_directory: Path,
 ) -> list[str]:
     return [
         python_executable,
         str(TRAIN_SCRIPT),
         f"experiment={experiment}",
+        f"hydra.run.dir={run_directory}",
+        "test=false",
     ]
 
 
@@ -102,23 +108,144 @@ def select_next_planned_experiment(
     return None
 
 
+def find_metrics_file(
+    run_directory: Path,
+) -> Path:
+    metrics_files = list(
+        run_directory.rglob("metrics.csv")
+    )
+
+    if not metrics_files:
+        raise FileNotFoundError(
+            "Training finished, but no metrics.csv file "
+            f"was found under {run_directory}."
+        )
+
+    return max(
+        metrics_files,
+        key=lambda path: path.stat().st_mtime,
+    )
+
+
+def parse_float(value: str | None) -> float | None:
+    if value is None:
+        return None
+
+    value = value.strip()
+
+    if not value:
+        return None
+
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def read_validation_metrics(
+    metrics_path: Path,
+) -> tuple[float, float | None]:
+    with metrics_path.open(
+        "r",
+        newline="",
+        encoding="utf-8",
+    ) as csvfile:
+        metric_rows = list(
+            csv.DictReader(csvfile)
+        )
+
+    best_accuracy = None
+    best_f1 = None
+    all_f1_values = []
+
+    for metric_row in metric_rows:
+        accuracy = parse_float(
+            metric_row.get("val/acc")
+        )
+
+        f1 = parse_float(
+            metric_row.get("val/f1")
+        )
+
+        if f1 is not None:
+            all_f1_values.append(f1)
+
+        if accuracy is None:
+            continue
+
+        if (
+            best_accuracy is None
+            or accuracy > best_accuracy
+        ):
+            best_accuracy = accuracy
+            best_f1 = f1
+
+    if best_accuracy is None:
+        raise ValueError(
+            "metrics.csv does not contain a valid "
+            "'val/acc' value."
+        )
+
+    if best_f1 is None and all_f1_values:
+        best_f1 = max(all_f1_values)
+
+    return best_accuracy, best_f1
+
+
+def make_run_directory(
+    experiment_id: str,
+) -> Path:
+    timestamp = datetime.now().strftime(
+        "%Y%m%d_%H%M%S"
+    )
+
+    return (
+        RUN_DIRECTORY
+        / f"{experiment_id}_{timestamp}"
+    ).resolve()
+
+
 def run_experiment(
     row: dict[str, str],
     rows: list[dict[str, str]],
     python_executable: str,
 ) -> None:
-    LOG_DIRECTORY.mkdir(parents=True, exist_ok=True)
+    LOG_DIRECTORY.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    RUN_DIRECTORY.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     experiment_id = row["experiment_id"]
-    log_path = LOG_DIRECTORY / f"{experiment_id}.log"
+
+    log_path = (
+        LOG_DIRECTORY
+        / f"{experiment_id}.log"
+    ).resolve()
+
+    run_directory = make_run_directory(
+        experiment_id
+    )
+
+    run_directory.mkdir(
+        parents=True,
+        exist_ok=False,
+    )
 
     command = build_command(
         experiment=row["experiment"],
         python_executable=python_executable,
+        run_directory=run_directory,
     )
 
     print("\nExecuting command:\n")
     print(subprocess.list2cmdline(command))
+
+    print(f"\nRun directory:\n{run_directory}")
     print(f"\nLog file:\n{log_path}\n")
 
     row["status"] = "running"
@@ -127,9 +254,13 @@ def run_experiment(
     )
     row["finished_at"] = ""
     row["return_code"] = ""
-    row["run_directory"] = ""
+    row["run_directory"] = str(
+        run_directory
+    )
     row["log_file"] = str(log_path)
     row["error_message"] = ""
+    row["val_accuracy"] = ""
+    row["val_f1"] = ""
 
     write_results(rows)
 
@@ -147,38 +278,84 @@ def run_experiment(
                 check=False,
             )
 
-        row["return_code"] = str(result.returncode)
-        row["finished_at"] = datetime.now().isoformat(
-            timespec="seconds"
+        row["return_code"] = str(
+            result.returncode
         )
 
-        if result.returncode == 0:
-            row["status"] = "completed"
-            print(
-                f"Experiment {experiment_id} completed successfully."
+        row["finished_at"] = (
+            datetime.now().isoformat(
+                timespec="seconds"
             )
-        else:
+        )
+
+        if result.returncode != 0:
             row["status"] = "failed"
             row["error_message"] = (
-                f"Training returned exit code "
+                "Training returned exit code "
                 f"{result.returncode}."
             )
 
             print(
-                f"Experiment {experiment_id} failed with "
-                f"exit code {result.returncode}."
+                f"Experiment {experiment_id} failed "
+                f"with exit code {result.returncode}."
             )
+
+            return
+
+        metrics_path = find_metrics_file(
+            run_directory
+        )
+
+        val_accuracy, val_f1 = (
+            read_validation_metrics(
+                metrics_path
+            )
+        )
+
+        row["val_accuracy"] = str(
+            val_accuracy
+        )
+
+        if val_f1 is not None:
+            row["val_f1"] = str(val_f1)
+
+        row["status"] = "completed"
+
+        print(
+            f"Experiment {experiment_id} "
+            "completed successfully."
+        )
+
+        print(
+            f"Validation accuracy: "
+            f"{row['val_accuracy']}"
+        )
+
+        print(
+            f"Validation F1: "
+            f"{row['val_f1'] or 'not found'}"
+        )
+
+        print(
+            f"Metrics file: {metrics_path}"
+        )
 
     except Exception as error:
         row["status"] = "failed"
-        row["finished_at"] = datetime.now().isoformat(
-            timespec="seconds"
+
+        row["finished_at"] = (
+            datetime.now().isoformat(
+                timespec="seconds"
+            )
         )
+
         row["error_message"] = str(error)
 
         print(
-            f"Experiment {experiment_id} could not be run:"
+            f"Experiment {experiment_id} "
+            "could not be completed:"
         )
+
         print(error)
 
     finally:
@@ -188,7 +365,8 @@ def run_experiment(
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Preview or run the next planned scGeneScope experiment."
+            "Preview or run the next planned "
+            "scGeneScope experiment."
         )
     )
 
@@ -205,8 +383,8 @@ def main() -> None:
         "--python",
         default=sys.executable,
         help=(
-            "Python executable used to start training. "
-            "Defaults to the current Python interpreter."
+            "Python executable used to start "
+            "training."
         ),
     )
 
@@ -222,38 +400,70 @@ def main() -> None:
     print(f"Project root:\n{PROJECT_ROOT}\n")
     print(f"Training script:\n{TRAIN_SCRIPT}\n")
     print(f"Python:\n{args.python}\n")
-    print(f"Found {planned_count} planned experiments.\n")
 
-    row = select_next_planned_experiment(rows)
+    print(
+        f"Found {planned_count} "
+        "planned experiments.\n"
+    )
+
+    row = select_next_planned_experiment(
+        rows
+    )
 
     if row is None:
-        print("There are no planned experiments to run.")
+        print(
+            "There are no planned experiments "
+            "to run."
+        )
         return
+
+    preview_directory = (
+        RUN_DIRECTORY
+        / f"{row['experiment_id']}_TIMESTAMP"
+    ).resolve()
 
     command = build_command(
         experiment=row["experiment"],
         python_executable=args.python,
+        run_directory=preview_directory,
     )
 
     print("Next experiment:")
     print(f"ID: {row['experiment_id']}")
     print(f"Method: {row['search_method']}")
+
     print(
         f"Setting: {row['model_setting']} / "
         f"{row['profile_setting']}"
     )
+
     print(f"Experiment: {row['experiment']}")
 
-    selection_reason = row.get("selection_reason", "").strip()
+    selection_reason = row.get(
+        "selection_reason",
+        "",
+    ).strip()
 
     if selection_reason:
-        print(f"Selection reason: {selection_reason}")
+        print(
+            f"Selection reason: "
+            f"{selection_reason}"
+        )
 
     print("\nCommand that will be executed:\n")
     print(subprocess.list2cmdline(command))
 
+    print(
+        "\nNote: test=false is used during search. "
+        "The held-out test set is evaluated only "
+        "after selecting the best model."
+    )
+
     if not args.execute:
-        print("\nDry run complete. No experiment was started.")
+        print(
+            "\nDry run complete. "
+            "No experiment was started."
+        )
         return
 
     run_experiment(

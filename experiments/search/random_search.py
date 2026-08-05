@@ -61,7 +61,10 @@ def read_existing_rows() -> list[dict[str, str]]:
 
 
 def write_rows(rows: list[dict[str, str]]) -> None:
-    RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    RESULTS_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     with RESULTS_PATH.open(
         "w",
@@ -103,13 +106,26 @@ def row_key(
     )
 
 
+def get_random_rows(
+    rows: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    return [
+        row
+        for row in rows
+        if row.get("search_method") == "random"
+    ]
+
+
 def next_experiment_number(
     rows: list[dict[str, str]],
 ) -> int:
     numbers = []
 
-    for row in rows:
-        experiment_id = row.get("experiment_id", "")
+    for row in get_random_rows(rows):
+        experiment_id = row.get(
+            "experiment_id",
+            "",
+        )
 
         if not experiment_id.startswith("random_"):
             continue
@@ -121,10 +137,7 @@ def next_experiment_number(
         except ValueError:
             continue
 
-    if not numbers:
-        return 1
-
-    return max(numbers) + 1
+    return max(numbers, default=0) + 1
 
 
 def make_result_row(
@@ -134,7 +147,9 @@ def make_result_row(
     validate_configuration(config)
 
     return {
-        "experiment_id": f"random_{experiment_number:03d}",
+        "experiment_id": (
+            f"random_{experiment_number:03d}"
+        ),
         "search_method": "random",
         "model_setting": config["model_setting"],
         "profile_setting": config["profile_setting"],
@@ -163,15 +178,34 @@ def back_up_results() -> None:
     if not RESULTS_PATH.exists():
         return
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime(
+        "%Y%m%d_%H%M%S"
+    )
+
     backup_path = (
         SEARCH_DIRECTORY
         / f"master_results_backup_{timestamp}.csv"
     )
 
-    shutil.copy2(RESULTS_PATH, backup_path)
+    shutil.copy2(
+        RESULTS_PATH,
+        backup_path,
+    )
 
-    print(f"Backed up existing results to:\n{backup_path}\n")
+    print(
+        f"Backed up existing results to:\n"
+        f"{backup_path}\n"
+    )
+
+
+def remove_random_rows(
+    rows: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    return [
+        row
+        for row in rows
+        if row.get("search_method") != "random"
+    ]
 
 
 def select_configurations(
@@ -179,26 +213,35 @@ def select_configurations(
     number_to_select: int,
     seed: int,
 ) -> list[dict[str, Any]]:
-    runnable_configurations = generate_all_configurations(
-        runnable_only=True
+    runnable_configurations = (
+        generate_all_configurations(
+            runnable_only=True
+        )
     )
+
+    random_rows = get_random_rows(rows)
 
     existing_keys = {
         row_key(row)
-        for row in rows
+        for row in random_rows
     }
 
     available_configurations = [
         config
         for config in runnable_configurations
-        if configuration_key(config) not in existing_keys
+        if configuration_key(config)
+        not in existing_keys
     ]
 
-    if number_to_select > len(available_configurations):
+    if number_to_select > len(
+        available_configurations
+    ):
         raise ValueError(
-            f"Requested {number_to_select} new experiments, "
-            f"but only {len(available_configurations)} untested "
-            "runnable configurations remain."
+            f"Requested {number_to_select} new "
+            f"experiments, but only "
+            f"{len(available_configurations)} "
+            "untested random-search configurations "
+            "remain."
         )
 
     random_generator = random.Random(seed)
@@ -212,8 +255,8 @@ def select_configurations(
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Add randomly selected experiments to the shared "
-            "experiment-results file."
+            "Add randomly selected experiments to "
+            "the shared experiment-results file."
         )
     )
 
@@ -231,15 +274,19 @@ def main() -> None:
         "--seed",
         type=int,
         default=42,
-        help="Random seed used for experiment selection.",
+        help=(
+            "Random seed used for experiment "
+            "selection."
+        ),
     )
 
     parser.add_argument(
         "--reset",
         action="store_true",
         help=(
-            "Back up the existing results file and create "
-            "a new random-search plan."
+            "Back up the results file and remove "
+            "existing random-search rows. Rows from "
+            "other search strategies are preserved."
         ),
     )
 
@@ -250,19 +297,23 @@ def main() -> None:
             "--num-experiments must be at least 1."
         )
 
+    rows = read_existing_rows()
+
     if args.reset:
         back_up_results()
-        rows = []
-    else:
-        rows = read_existing_rows()
+        rows = remove_random_rows(rows)
 
-    selected_configurations = select_configurations(
-        rows=rows,
-        number_to_select=args.num_experiments,
-        seed=args.seed,
+    selected_configurations = (
+        select_configurations(
+            rows=rows,
+            number_to_select=args.num_experiments,
+            seed=args.seed,
+        )
     )
 
-    experiment_number = next_experiment_number(rows)
+    experiment_number = (
+        next_experiment_number(rows)
+    )
 
     new_rows = []
 
@@ -279,7 +330,13 @@ def main() -> None:
     write_rows(rows)
 
     runnable_count = len(
-        generate_all_configurations(runnable_only=True)
+        generate_all_configurations(
+            runnable_only=True
+        )
+    )
+
+    random_count = len(
+        get_random_rows(rows)
     )
 
     print(
@@ -288,7 +345,13 @@ def main() -> None:
     )
 
     print(
-        f"Added {len(new_rows)} random experiment(s).\n"
+        f"Added {len(new_rows)} random "
+        "experiment(s)."
+    )
+
+    print(
+        f"Total random-search rows: "
+        f"{random_count}\n"
     )
 
     for row in new_rows:
@@ -297,9 +360,14 @@ def main() -> None:
             f"  {row['model_setting']} / "
             f"{row['profile_setting']}"
         )
-        print(f"  experiment={row['experiment']}\n")
+        print(
+            f"  experiment="
+            f"{row['experiment']}\n"
+        )
 
-    print(f"Results file:\n{RESULTS_PATH}")
+    print(
+        f"Results file:\n{RESULTS_PATH}"
+    )
 
 
 if __name__ == "__main__":
