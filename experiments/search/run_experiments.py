@@ -98,9 +98,33 @@ def build_command(
     ]
 
 
-def select_next_planned_experiment(
+def select_planned_experiment(
     rows: list[dict[str, str]],
+    experiment_id: str | None = None,
 ) -> dict[str, str] | None:
+    if experiment_id is not None:
+        matching_rows = [
+            row
+            for row in rows
+            if row.get("experiment_id") == experiment_id
+        ]
+
+        if not matching_rows:
+            raise ValueError(
+                "No experiment was found with ID "
+                f"'{experiment_id}'."
+            )
+
+        row = matching_rows[0]
+
+        if row.get("status") != "planned":
+            raise ValueError(
+                f"Experiment '{experiment_id}' has status "
+                f"'{row.get('status', '')}', not 'planned'."
+            )
+
+        return row
+
     for row in rows:
         if row.get("status") == "planned":
             return row
@@ -365,7 +389,7 @@ def run_experiment(
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Preview or run the next planned "
+            "Preview or run a planned "
             "scGeneScope experiment."
         )
     )
@@ -374,7 +398,7 @@ def main() -> None:
         "--execute",
         action="store_true",
         help=(
-            "Run the next planned experiment. "
+            "Run the selected planned experiment. "
             "Without this flag, only show the command."
         ),
     )
@@ -385,6 +409,16 @@ def main() -> None:
         help=(
             "Python executable used to start "
             "training."
+        ),
+    )
+
+    parser.add_argument(
+        "--experiment-id",
+        default=None,
+        help=(
+            "ID of a specific planned experiment "
+            "to preview or run. If omitted, the "
+            "first planned row is selected."
         ),
     )
 
@@ -406,9 +440,13 @@ def main() -> None:
         "planned experiments.\n"
     )
 
-    row = select_next_planned_experiment(
-        rows
-    )
+    try:
+        row = select_planned_experiment(
+            rows,
+            experiment_id=args.experiment_id,
+        )
+    except ValueError as error:
+        parser.error(str(error))
 
     if row is None:
         print(
@@ -428,7 +466,7 @@ def main() -> None:
         run_directory=preview_directory,
     )
 
-    print("Next experiment:")
+    print("Selected experiment:")
     print(f"ID: {row['experiment_id']}")
     print(f"Method: {row['search_method']}")
 
