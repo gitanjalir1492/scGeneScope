@@ -4,21 +4,61 @@ scGeneScope: A Perturbationally-Paired Single Cell Imaging and Transcriptomics D
 
 ## Internship Extension
 
-This fork extends the original scGeneScope repository for an internship
-project on automated multimodal model exploration.
+## Internship Extension
+
+This fork extends the original scGeneScope repository with a framework for automated multimodal model exploration.
+
+The extension enables reproducible comparison of multiple search strategies over a fixed Hydra-defined search space while using the existing scGeneScope training pipeline.
 
 Current additions include:
 
-- reproduction of nine representative scGeneScope baselines
+- reproduction of representative scGeneScope baseline models
 - consolidated benchmark results in `baseline_results.md`
-- a constrained Hydra-compatible search space
-- reproducible random-search experiment sampling
-- an experiment runner for executing and tracking model configurations
+- a constrained, Hydra-compatible multimodal search space
+- random search over valid model configurations
+- Bayesian optimization using Optuna
+- LLM-guided search scaffolding with configurable experiment memory
+- automated experiment execution, validation metric extraction, and experiment tracking
+- centralized experiment history stored in `experiments/search/master_results.csv`
 
-Search tooling is located in:
+The search framework is located in:
 
 ```text
 experiments/search/
+├── search_space.py
+├── random_search.py
+├── bayesian_search.py
+├── llm_search.py
+├── run_experiments.py
+└── master_results.csv
+```
+
+All search strategies use the same execution pipeline:
+
+```text
+Search Strategy
+        ↓
+Select next configuration
+        ↓
+run_experiments.py
+        ↓
+Hydra training
+        ↓
+Validation metric extraction
+        ↓
+master_results.csv
+        ↓
+Next experiment
+```
+
+The framework currently supports comparison of:
+
+- Random Search
+- Bayesian Optimization
+- LLM-guided Search
+- LLM-guided Search with experiment summaries
+
+During search, only validation metrics are used for model selection. The held-out test set is reserved for final evaluation of the best discovered configuration.
 
 ## Installation
 
