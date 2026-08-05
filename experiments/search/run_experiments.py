@@ -23,12 +23,19 @@ LOG_DIRECTORY = SEARCH_DIRECTORY / "logs"
 FIELDNAMES = [
     "experiment_id",
     "search_method",
+    "model_setting",
+    "profile_setting",
     "rna_encoder",
     "image_encoder",
-    "fusion",
     "aggregation",
+    "fusion",
     "experiment",
     "status",
+    "val_accuracy",
+    "val_f1",
+    "test_accuracy",
+    "test_f1",
+    "experiment_summary",
     "started_at",
     "finished_at",
     "return_code",
@@ -39,7 +46,7 @@ FIELDNAMES = [
 
 
 def read_results() -> list[dict[str, str]]:
-    """Read the experiment tracking CSV."""
+    """Read the shared experiment results file."""
 
     if not RESULTS_PATH.exists():
         raise FileNotFoundError(
@@ -51,11 +58,8 @@ def read_results() -> list[dict[str, str]]:
         newline="",
         encoding="utf-8",
     ) as csvfile:
-        reader = csv.DictReader(csvfile)
-        rows = list(reader)
+        rows = list(csv.DictReader(csvfile))
 
-    # Older CSV files may not yet contain every tracking column.
-    # Add any missing fields without deleting existing information.
     for row in rows:
         for fieldname in FIELDNAMES:
             row.setdefault(fieldname, "")
@@ -64,7 +68,7 @@ def read_results() -> list[dict[str, str]]:
 
 
 def write_results(rows: list[dict[str, str]]) -> None:
-    """Write all experiment records back to the tracking CSV."""
+    """Save the current experiment records."""
 
     with RESULTS_PATH.open(
         "w",
@@ -84,8 +88,6 @@ def build_command(
     experiment: str,
     python_executable: str,
 ) -> list[str]:
-    """Build the Hydra training command for one experiment."""
-
     return [
         python_executable,
         str(TRAIN_SCRIPT),
@@ -96,8 +98,6 @@ def build_command(
 def select_next_planned_experiment(
     rows: list[dict[str, str]],
 ) -> dict[str, str] | None:
-    """Return the first experiment whose status is planned."""
-
     for row in rows:
         if row.get("status") == "planned":
             return row
@@ -110,7 +110,7 @@ def run_experiment(
     rows: list[dict[str, str]],
     python_executable: str,
 ) -> None:
-    """Run one experiment and update its tracking information."""
+    """Run one planned experiment and record whether it succeeded."""
 
     LOG_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
@@ -118,8 +118,8 @@ def run_experiment(
     log_path = LOG_DIRECTORY / f"{experiment_id}.log"
 
     command = build_command(
-        row["experiment"],
-        python_executable,
+        experiment=row["experiment"],
+        python_executable=python_executable,
     )
 
     print("\nExecuting command:\n")
@@ -127,7 +127,9 @@ def run_experiment(
     print(f"\nLog file:\n{log_path}\n")
 
     row["status"] = "running"
-    row["started_at"] = datetime.now().isoformat(timespec="seconds")
+    row["started_at"] = datetime.now().isoformat(
+        timespec="seconds"
+    )
     row["finished_at"] = ""
     row["return_code"] = ""
     row["run_directory"] = ""
@@ -163,9 +165,10 @@ def run_experiment(
         else:
             row["status"] = "failed"
             row["error_message"] = (
-                f"Training process returned exit code "
+                f"Training returned exit code "
                 f"{result.returncode}."
             )
+
             print(
                 f"Experiment {experiment_id} failed with "
                 f"exit code {result.returncode}."
@@ -190,8 +193,7 @@ def run_experiment(
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Preview or run the next planned scGeneScope "
-            "search experiment."
+            "Preview or run the next planned scGeneScope experiment."
         )
     )
 
@@ -199,8 +201,8 @@ def main() -> None:
         "--execute",
         action="store_true",
         help=(
-            "Actually execute the next planned experiment. "
-            "Without this flag, the script performs a dry run."
+            "Run the next planned experiment. "
+            "Without this flag, only show the command."
         ),
     )
 
@@ -208,7 +210,7 @@ def main() -> None:
         "--python",
         default=sys.executable,
         help=(
-            "Python executable used to launch training. "
+            "Python executable used to start training. "
             "Defaults to the current Python interpreter."
         ),
     )
@@ -234,13 +236,17 @@ def main() -> None:
         return
 
     command = build_command(
-        row["experiment"],
-        args.python,
+        experiment=row["experiment"],
+        python_executable=args.python,
     )
 
     print("Next experiment:")
     print(f"ID: {row['experiment_id']}")
     print(f"Method: {row['search_method']}")
+    print(
+        f"Setting: {row['model_setting']} / "
+        f"{row['profile_setting']}"
+    )
     print(f"Experiment: {row['experiment']}")
     print("\nCommand that will be executed:\n")
     print(subprocess.list2cmdline(command))
