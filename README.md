@@ -4,8 +4,6 @@ scGeneScope: A Perturbationally-Paired Single Cell Imaging and Transcriptomics D
 
 ## Internship Extension
 
-## Internship Extension
-
 This fork extends the original scGeneScope repository with a framework for automated multimodal model exploration.
 
 The extension enables reproducible comparison of multiple search strategies over a fixed Hydra-defined search space while using the existing scGeneScope training pipeline.
