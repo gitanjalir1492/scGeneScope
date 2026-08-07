@@ -13,6 +13,10 @@ from search_space import (
 SEARCH_DIR = Path(__file__).resolve().parent
 RESULTS_PATH = SEARCH_DIR / "master_results.csv"
 
+# Keep this fixed for every LLM search condition so that the only
+# experimental difference is the memory supplied to the model.
+LLM_MODEL = "openai_gpt54_mini"
+
 FIELDS = [
     "experiment_id",
     "search_method",
@@ -39,7 +43,7 @@ FIELDS = [
 ]
 
 
-def load_results():
+def load_results() -> list[dict[str, str]]:
     if not RESULTS_PATH.exists():
         return []
 
@@ -57,7 +61,9 @@ def load_results():
     return rows
 
 
-def save_results(rows):
+def save_results(
+    rows: list[dict[str, str]],
+) -> None:
     with RESULTS_PATH.open(
         "w",
         newline="",
@@ -72,7 +78,9 @@ def save_results(rows):
         writer.writerows(rows)
 
 
-def config_key(config):
+def config_key(
+    config: dict,
+) -> tuple:
     return (
         config["model_setting"],
         config["profile_setting"],
@@ -83,7 +91,9 @@ def config_key(config):
     )
 
 
-def row_key(row):
+def row_key(
+    row: dict[str, str],
+) -> tuple:
     return (
         row.get("model_setting") or None,
         row.get("profile_setting") or None,
@@ -94,14 +104,16 @@ def row_key(row):
     )
 
 
-def method_name(memory_mode):
+def method_name(
+    memory_mode: str,
+) -> str:
     if memory_mode == "metrics":
         return "llm_metrics"
 
     return "llm_summary"
 
 
-def build_lookup():
+def build_lookup() -> tuple[dict, dict]:
     configs = generate_all_configurations(
         runnable_only=True
     )
@@ -120,7 +132,10 @@ def build_lookup():
     return config_by_id, id_by_key
 
 
-def format_config(config_id, config):
+def format_config(
+    config_id: str,
+    config: dict,
+) -> str:
     return (
         f"{config_id}: "
         f"model_setting={config['model_setting']}, "
@@ -132,7 +147,11 @@ def format_config(config_id, config):
     )
 
 
-def format_history(row, config_id, memory_mode):
+def format_history(
+    row: dict[str, str],
+    config_id: str,
+    memory_mode: str,
+) -> str:
     text = (
         f"Configuration: {config_id}\n"
         f"Model setting: {row.get('model_setting')}\n"
@@ -156,7 +175,10 @@ def format_history(row, config_id, memory_mode):
     return text
 
 
-def build_prompt(rows, memory_mode):
+def build_prompt(
+    rows: list[dict[str, str]],
+    memory_mode: str,
+) -> tuple[str, dict, list[str]]:
     search_method = method_name(memory_mode)
     config_by_id, id_by_key = build_lookup()
 
@@ -192,7 +214,9 @@ def build_prompt(rows, memory_mode):
     history = []
 
     for row in completed_rows:
-        config_id = id_by_key.get(row_key(row))
+        config_id = id_by_key.get(
+            row_key(row)
+        )
 
         if config_id is not None:
             history.append(
@@ -219,24 +243,44 @@ def build_prompt(rows, memory_mode):
     )
 
     prompt = f"""
-You are choosing the next experiment for a model search study in
-multimodal cellular profiling.
+You are acting as an ML research scientist choosing the next experiment
+in a sequential model-search study for multimodal cellular profiling.
 
-The aim is to find a strong model configuration within a limited
-experiment budget. Use the previous validation results to decide which
-untested configuration is most informative or most likely to improve
-performance.
+The experiment budget is limited. Your objective is therefore not only
+to find a high-performing configuration, but to use each experiment
+efficiently to learn which design decisions matter.
 
-Important:
-- Optimise validation accuracy.
-- Use validation F1 as supporting evidence.
-- Do not choose a configuration that has already been tested.
-- Do not assume that multimodal or more complex models are always better.
-- Consider what has already been learned about the representations,
-  profile settings, aggregation methods and fusion methods.
-- When there is little evidence, choose an experiment that will reduce
-  uncertainty and help guide later choices.
-- Only select from the available configuration IDs listed below.
+Use the completed experiment history to decide what should be tested
+next.
+
+Decision principles:
+- Validation accuracy is the primary optimization objective.
+- Use validation F1 as supporting evidence, especially when accuracy
+  differences are small.
+- Balance exploration and exploitation.
+- When evidence is weak or sparse, prefer experiments that reduce
+  uncertainty about an important design choice.
+- When previous experiments provide strong evidence for a promising
+  direction, exploit that evidence by testing a logical extension.
+- Prefer comparisons that help isolate the effect of representation,
+  profile setting, aggregation, or fusion when possible.
+- Avoid changing several design choices simultaneously when a simpler
+  experiment could answer the same question.
+- Do not overinterpret a single experiment or small performance
+  difference.
+- Do not assume that multimodal, multiprofile, or more complex models
+  will necessarily outperform simpler models.
+- Consider whether an experiment is informative even if it may not be
+  the configuration with the highest expected immediate performance.
+- Do not repeat a configuration that has already been selected by this
+  search condition.
+- Select only from the available configuration IDs listed below.
+
+For your selection reason, briefly state:
+1. what the existing evidence or uncertainty is,
+2. what this experiment will test or clarify, and
+3. why it is the best use of the next experiment under the limited
+   budget.
 
 Previous completed experiments:
 {history_text}
@@ -246,19 +290,76 @@ Available untested configurations:
 
 Choose exactly one configuration.
 
-Return JSON only, using this format:
+Return JSON only, using exactly this format:
 {{
   "configuration_id": "config_001",
-  "reason": "Explain briefly what evidence or uncertainty motivated this choice."
+  "reason": "Briefly explain the evidence, question being tested, and why this is the best next experiment."
 }}
 """.strip()
 
     return prompt, config_by_id, available_ids
 
 
-def parse_response(text):
+def query_llm(
+    prompt: str,
+) -> str:
     try:
-        response = json.loads(text)
+        from openai import OpenAI
+    except ImportError as error:
+        raise RuntimeError(
+            "The OpenAI SDK is not installed. "
+            "Run: poetry add openai"
+        ) from error
+
+    client = OpenAI()
+
+    response = client.responses.create(
+        model=LLM_MODEL,
+        input=prompt,
+        max_output_tokens=500,
+    )
+
+    response_text = response.output_text
+
+    if not isinstance(
+        response_text,
+        str,
+    ) or not response_text.strip():
+        raise RuntimeError(
+            "The LLM returned no text response."
+        )
+
+    return response_text.strip()
+
+
+def clean_json_text(
+    text: str,
+) -> str:
+    cleaned = text.strip()
+
+    if cleaned.startswith("```"):
+        lines = cleaned.splitlines()
+
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+
+        cleaned = "\n".join(lines).strip()
+
+    return cleaned
+
+
+def parse_response(
+    text: str,
+) -> tuple[str, str]:
+    cleaned_text = clean_json_text(text)
+
+    try:
+        response = json.loads(
+            cleaned_text
+        )
     except json.JSONDecodeError as error:
         raise ValueError(
             "Response is not valid JSON."
@@ -269,8 +370,13 @@ def parse_response(text):
             "Response must be a JSON object."
         )
 
-    config_id = response.get("configuration_id")
-    reason = response.get("reason", "")
+    config_id = response.get(
+        "configuration_id"
+    )
+    reason = response.get(
+        "reason",
+        "",
+    )
 
     if not isinstance(config_id, str):
         raise ValueError(
@@ -282,10 +388,18 @@ def parse_response(text):
             "Reason must be a string."
         )
 
-    return config_id, reason
+    if not reason.strip():
+        raise ValueError(
+            "Reason must not be empty."
+        )
+
+    return config_id, reason.strip()
 
 
-def next_number(rows, search_method):
+def next_number(
+    rows: list[dict[str, str]],
+    search_method: str,
+) -> int:
     if search_method == "llm_metrics":
         prefix = "llm_metrics_"
     else:
@@ -304,7 +418,9 @@ def next_number(rows, search_method):
 
         try:
             numbers.append(
-                int(experiment_id.split("_")[-1])
+                int(
+                    experiment_id.split("_")[-1]
+                )
             )
         except ValueError:
             pass
@@ -313,11 +429,11 @@ def next_number(rows, search_method):
 
 
 def make_row(
-    config,
-    search_method,
-    reason,
-    number,
-):
+    config: dict,
+    search_method: str,
+    reason: str,
+    number: int,
+) -> dict[str, str]:
     if search_method == "llm_metrics":
         prefix = "llm_metrics"
     else:
@@ -363,8 +479,13 @@ def make_row(
     }
 
 
-def main():
-    parser = argparse.ArgumentParser()
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Generate and validate the next "
+            "LLM-guided search proposal."
+        )
+    )
 
     parser.add_argument(
         "--memory-mode",
@@ -376,8 +497,21 @@ def main():
     )
 
     parser.add_argument(
+        "--call-api",
+        action="store_true",
+        help=(
+            "Call the fixed study LLM directly "
+            "using the configured environment."
+        ),
+    )
+
+    parser.add_argument(
         "--response-file",
         type=Path,
+        help=(
+            "Read an offline JSON response instead "
+            "of calling the LLM API."
+        ),
     )
 
     parser.add_argument(
@@ -386,6 +520,15 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if (
+        args.call_api
+        and args.response_file is not None
+    ):
+        parser.error(
+            "Use either --call-api or "
+            "--response-file, not both."
+        )
 
     rows = load_results()
 
@@ -409,24 +552,40 @@ def main():
             f"{args.save_prompt}"
         )
 
-    if args.response_file is None:
+    if args.call_api:
+        print(
+            f"Calling fixed LLM model: "
+            f"{LLM_MODEL}"
+        )
+
+        response_text = query_llm(
+            prompt
+        )
+
+    elif args.response_file is not None:
+        if not args.response_file.exists():
+            raise FileNotFoundError(
+                f"Response file not found: "
+                f"{args.response_file}"
+            )
+
+        response_text = (
+            args.response_file.read_text(
+                encoding="utf-8",
+            )
+        )
+
+    else:
         print(prompt)
         print(
-            "\nNo experiment was added."
+            f"\nFixed study model: {LLM_MODEL}"
+        )
+        print(
+            "\nNo experiment was added. "
+            "Use --call-api for a live selection "
+            "or --response-file for offline testing."
         )
         return
-
-    if not args.response_file.exists():
-        raise FileNotFoundError(
-            f"Response file not found: "
-            f"{args.response_file}"
-        )
-
-    response_text = (
-        args.response_file.read_text(
-            encoding="utf-8",
-        )
-    )
 
     config_id, reason = parse_response(
         response_text
@@ -461,6 +620,7 @@ def main():
     rows.append(row)
     save_results(rows)
 
+    print(f"Model: {LLM_MODEL}")
     print(f"Selected: {config_id}")
     print(f"Configuration: {config}")
     print(f"Reason: {reason}")
