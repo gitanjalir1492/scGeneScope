@@ -143,6 +143,122 @@ def run_command(
         )
 
 
+def get_gpu_uuid(
+    gpu: int,
+) -> str:
+    command = [
+        "nvidia-smi",
+        "--query-gpu=index,uuid",
+        "--format=csv,noheader,nounits",
+    ]
+
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Could not query GPU information with nvidia-smi."
+        )
+
+    for line in result.stdout.splitlines():
+        parts = [
+            part.strip()
+            for part in line.split(",", maxsplit=1)
+        ]
+
+        if len(parts) != 2:
+            continue
+
+        index_text, gpu_uuid = parts
+
+        try:
+            index = int(index_text)
+        except ValueError:
+            continue
+
+        if index == gpu:
+            return gpu_uuid
+
+    raise ValueError(
+        f"GPU index {gpu} was not found."
+    )
+
+
+def gpu_processes(
+    gpu: int,
+) -> list[str]:
+    gpu_uuid = get_gpu_uuid(
+        gpu
+    )
+
+    command = [
+        "nvidia-smi",
+        "--query-compute-apps=gpu_uuid,pid,process_name",
+        "--format=csv,noheader,nounits",
+    ]
+
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Could not query GPU processes with nvidia-smi."
+        )
+
+    processes = []
+
+    for line in result.stdout.splitlines():
+        parts = [
+            part.strip()
+            for part in line.split(",", maxsplit=2)
+        ]
+
+        if len(parts) != 3:
+            continue
+
+        process_gpu_uuid, pid, process_name = parts
+
+        if process_gpu_uuid == gpu_uuid:
+            processes.append(
+                f"PID {pid}: {process_name}"
+            )
+
+    return processes
+
+
+def assert_gpu_available(
+    gpu: int,
+) -> None:
+    processes = gpu_processes(
+        gpu
+    )
+
+    if processes:
+        details = "\n".join(
+            f"  - {process}"
+            for process in processes
+        )
+
+        raise RuntimeError(
+            f"GPU {gpu} is already in use by "
+            "one or more compute processes:\n"
+            f"{details}\n"
+            "Refusing to start an autonomous run."
+        )
+
+    print(
+        f"GPU {gpu} availability check passed."
+    )
+
+
 def propose_next(
     method: str,
 ) -> dict[str, str]:
@@ -193,6 +309,10 @@ def execute_experiment(
     experiment_id: str,
     gpu: int,
 ) -> None:
+    assert_gpu_available(
+        gpu
+    )
+
     env = os.environ.copy()
 
     env["CUDA_VISIBLE_DEVICES"] = str(gpu)
@@ -298,6 +418,31 @@ def dry_run(
         f"{len(completed)}"
     )
 
+    try:
+        processes = gpu_processes(
+            gpu
+        )
+
+        if processes:
+            print(
+                f"\nGPU {gpu} is currently occupied:"
+            )
+
+            for process in processes:
+                print(
+                    f"  - {process}"
+                )
+        else:
+            print(
+                f"\nGPU {gpu} is currently free."
+            )
+
+    except Exception as error:
+        print(
+            "\nGPU availability could not be "
+            f"verified: {error}"
+        )
+
     if len(completed) >= budget:
         print(
             "\nBudget has already been reached. "
@@ -359,6 +504,10 @@ def run_search(
 
     print(f"Target budget: {budget}")
     print(f"GPU: {gpu}")
+
+    assert_gpu_available(
+        gpu
+    )
 
     while True:
         rows = load_results()
