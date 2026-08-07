@@ -12,6 +12,7 @@ RESULTS_PATH = SEARCH_DIR / "master_results.csv"
 RANDOM_SCRIPT = SEARCH_DIR / "random_search.py"
 BAYESIAN_SCRIPT = SEARCH_DIR / "bayesian_search.py"
 LLM_SCRIPT = SEARCH_DIR / "llm_search.py"
+SUMMARY_SCRIPT = SEARCH_DIR / "summarize_experiment.py"
 RUNNER_SCRIPT = SEARCH_DIR / "run_experiments.py"
 
 SUPPORTED_METHODS = [
@@ -152,9 +153,13 @@ def propose_next(
         for row in before_rows
     }
 
-    command = proposal_command(method)
+    command = proposal_command(
+        method
+    )
 
-    run_command(command)
+    run_command(
+        command
+    )
 
     after_rows = load_results()
 
@@ -162,8 +167,7 @@ def propose_next(
         row
         for row in after_rows
         if (
-            row.get("experiment_id")
-            not in before_ids
+            row.get("experiment_id") not in before_ids
             and row.get("search_method") == method
         )
     ]
@@ -204,6 +208,26 @@ def execute_experiment(
     run_command(
         command,
         env=env,
+    )
+
+
+def summarize_experiment(
+    experiment_id: str,
+) -> None:
+    command = [
+        sys.executable,
+        str(SUMMARY_SCRIPT),
+        "--experiment-id",
+        experiment_id,
+    ]
+
+    print(
+        f"\nGenerating experiment summary for "
+        f"{experiment_id}..."
+    )
+
+    run_command(
+        command
     )
 
 
@@ -302,6 +326,14 @@ def dry_run(
         print(
             "The loop would request one new "
             f"{method} proposal."
+        )
+
+    if method == "llm_summary":
+        print(
+            "\nAfter each successful llm_summary "
+            "experiment, the loop would generate "
+            "an automatic scientific summary before "
+            "requesting the next proposal."
         )
 
     print(
@@ -431,6 +463,47 @@ def run_search(
             "Validation F1: "
             f"{updated_row.get('val_f1')}"
         )
+
+        if method == "llm_summary":
+            summarize_experiment(
+                experiment_id
+            )
+
+            rows = load_results()
+
+            summarized_rows = [
+                candidate
+                for candidate in rows
+                if candidate.get(
+                    "experiment_id"
+                ) == experiment_id
+            ]
+
+            if not summarized_rows:
+                raise RuntimeError(
+                    "Summarized experiment "
+                    "disappeared from results."
+                )
+
+            summary = (
+                summarized_rows[0]
+                .get(
+                    "experiment_summary",
+                    "",
+                )
+                .strip()
+            )
+
+            if not summary:
+                raise RuntimeError(
+                    "llm_summary experiment "
+                    "completed but no experiment "
+                    "summary was stored."
+                )
+
+            print(
+                f"\nStored summary:\n{summary}"
+            )
 
 
 def main() -> None:
