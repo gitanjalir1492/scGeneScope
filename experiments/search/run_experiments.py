@@ -5,6 +5,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from results_io import atomic_write_csv
+
 
 SEARCH_DIRECTORY = Path(__file__).resolve().parent
 PROJECT_ROOT = SEARCH_DIRECTORY.parent.parent
@@ -70,18 +72,11 @@ def read_results() -> list[dict[str, str]]:
 def write_results(
     rows: list[dict[str, str]],
 ) -> None:
-    with RESULTS_PATH.open(
-        "w",
-        newline="",
-        encoding="utf-8",
-    ) as csvfile:
-        writer = csv.DictWriter(
-            csvfile,
-            fieldnames=FIELDNAMES,
-            extrasaction="ignore",
-        )
-        writer.writeheader()
-        writer.writerows(rows)
+    atomic_write_csv(
+        path=RESULTS_PATH,
+        fieldnames=FIELDNAMES,
+        rows=rows,
+    )
 
 
 def build_command(

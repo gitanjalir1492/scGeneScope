@@ -11,6 +11,7 @@ from search_space import (
     generate_all_configurations,
     validate_configuration,
 )
+from results_io import atomic_write_csv
 
 
 SEARCH_DIRECTORY = Path(__file__).resolve().parent
@@ -63,23 +64,11 @@ def read_existing_rows() -> list[dict[str, str]]:
 def write_rows(
     rows: list[dict[str, str]],
 ) -> None:
-    RESULTS_PATH.parent.mkdir(
-        parents=True,
-        exist_ok=True,
+    atomic_write_csv(
+        path=RESULTS_PATH,
+        fieldnames=FIELDNAMES,
+        rows=rows,
     )
-
-    with RESULTS_PATH.open(
-        "w",
-        newline="",
-        encoding="utf-8",
-    ) as csvfile:
-        writer = csv.DictWriter(
-            csvfile,
-            fieldnames=FIELDNAMES,
-            extrasaction="ignore",
-        )
-        writer.writeheader()
-        writer.writerows(rows)
 
 
 def configuration_key(

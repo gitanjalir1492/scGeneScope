@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from llm_search import LLM_MODEL
+from results_io import atomic_write_csv
 
 
 SEARCH_DIR = Path(__file__).resolve().parent
@@ -56,18 +57,11 @@ def load_results():
 
 
 def save_results(rows):
-    with RESULTS_PATH.open(
-        "w",
-        newline="",
-        encoding="utf-8",
-    ) as file:
-        writer = csv.DictWriter(
-            file,
-            fieldnames=FIELDS,
-            extrasaction="ignore",
-        )
-        writer.writeheader()
-        writer.writerows(rows)
+    atomic_write_csv(
+        path=RESULTS_PATH,
+        fieldnames=FIELDS,
+        rows=rows,
+    )
 
 
 def find_experiment(rows, experiment_id):

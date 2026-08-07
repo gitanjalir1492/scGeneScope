@@ -8,6 +8,7 @@ from search_space import (
     generate_all_configurations,
     validate_configuration,
 )
+from results_io import atomic_write_csv
 
 
 SEARCH_DIR = Path(__file__).resolve().parent
@@ -64,18 +65,11 @@ def load_results() -> list[dict[str, str]]:
 def save_results(
     rows: list[dict[str, str]],
 ) -> None:
-    with RESULTS_PATH.open(
-        "w",
-        newline="",
-        encoding="utf-8",
-    ) as file:
-        writer = csv.DictWriter(
-            file,
-            fieldnames=FIELDS,
-            extrasaction="ignore",
-        )
-        writer.writeheader()
-        writer.writerows(rows)
+    atomic_write_csv(
+        path=RESULTS_PATH,
+        fieldnames=FIELDS,
+        rows=rows,
+    )
 
 
 def config_key(
