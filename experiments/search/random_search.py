@@ -60,7 +60,9 @@ def read_existing_rows() -> list[dict[str, str]]:
     return rows
 
 
-def write_rows(rows: list[dict[str, str]]) -> None:
+def write_rows(
+    rows: list[dict[str, str]],
+) -> None:
     RESULTS_PATH.parent.mkdir(
         parents=True,
         exist_ok=True,
@@ -244,6 +246,8 @@ def select_configurations(
             "remain."
         )
 
+    # Preserve the original sampling protocol used to generate
+    # the existing random-search trajectory.
     random_generator = random.Random(seed)
 
     return random_generator.sample(
@@ -290,11 +294,27 @@ def main() -> None:
         ),
     )
 
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Show the random experiment(s) that "
+            "would be added without modifying "
+            "master_results.csv."
+        ),
+    )
+
     args = parser.parse_args()
 
     if args.num_experiments < 1:
         raise ValueError(
             "--num-experiments must be at least 1."
+        )
+
+    if args.reset and args.dry_run:
+        raise ValueError(
+            "--reset and --dry-run cannot be "
+            "used together."
         )
 
     rows = read_existing_rows()
@@ -323,20 +343,13 @@ def main() -> None:
             experiment_number=experiment_number,
         )
 
-        rows.append(result_row)
         new_rows.append(result_row)
         experiment_number += 1
-
-    write_rows(rows)
 
     runnable_count = len(
         generate_all_configurations(
             runnable_only=True
         )
-    )
-
-    random_count = len(
-        get_random_rows(rows)
     )
 
     print(
@@ -345,13 +358,8 @@ def main() -> None:
     )
 
     print(
-        f"Added {len(new_rows)} random "
-        "experiment(s)."
-    )
-
-    print(
-        f"Total random-search rows: "
-        f"{random_count}\n"
+        f"Selected {len(new_rows)} random "
+        "experiment(s).\n"
     )
 
     for row in new_rows:
@@ -364,6 +372,26 @@ def main() -> None:
             f"  experiment="
             f"{row['experiment']}\n"
         )
+
+    if args.dry_run:
+        print(
+            "Dry run complete. "
+            "No experiment was added."
+        )
+        return
+
+    rows.extend(new_rows)
+
+    write_rows(rows)
+
+    random_count = len(
+        get_random_rows(rows)
+    )
+
+    print(
+        f"Total random-search rows: "
+        f"{random_count}\n"
+    )
 
     print(
         f"Results file:\n{RESULTS_PATH}"
