@@ -19,7 +19,7 @@ TRAIN_SCRIPT = (
     / "train.py"
 )
 
-RESULTS_PATH = SEARCH_DIRECTORY / "master_results.csv"
+RESULTS_PATH = SEARCH_DIRECTORY / "results" / "master_results.csv"
 LOG_DIRECTORY = SEARCH_DIRECTORY / "logs"
 RUN_DIRECTORY = SEARCH_DIRECTORY / "runs"
 

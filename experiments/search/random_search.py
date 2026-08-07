@@ -15,7 +15,7 @@ from results_io import atomic_write_csv
 
 
 SEARCH_DIRECTORY = Path(__file__).resolve().parent
-RESULTS_PATH = SEARCH_DIRECTORY / "master_results.csv"
+RESULTS_PATH = SEARCH_DIRECTORY / "results" / "master_results.csv"
 
 FIELDNAMES = [
     "experiment_id",

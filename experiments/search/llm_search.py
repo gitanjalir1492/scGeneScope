@@ -12,7 +12,7 @@ from results_io import atomic_write_csv
 
 
 SEARCH_DIR = Path(__file__).resolve().parent
-RESULTS_PATH = SEARCH_DIR / "master_results.csv"
+RESULTS_PATH = SEARCH_DIR / "results" / "master_results.csv"
 
 # Keep this fixed for every LLM search condition so that the only
 # experimental difference is the memory supplied to the model.

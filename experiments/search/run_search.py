@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 SEARCH_DIR = Path(__file__).resolve().parent
-RESULTS_PATH = SEARCH_DIR / "master_results.csv"
+RESULTS_PATH = SEARCH_DIR / "results" / "master_results.csv"
 
 RANDOM_SCRIPT = SEARCH_DIR / "random_search.py"
 BAYESIAN_SCRIPT = SEARCH_DIR / "bayesian_search.py"
