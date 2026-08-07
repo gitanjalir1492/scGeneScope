@@ -5,7 +5,6 @@ from typing import Any
 
 from search_space import (
     AGGREGATIONS,
-    FUSIONS,
     IMAGE_ENCODERS,
     MODEL_SETTINGS,
     PROFILE_SETTINGS,
@@ -63,7 +62,9 @@ def read_rows() -> list[dict[str, str]]:
     return rows
 
 
-def write_rows(rows: list[dict[str, str]]) -> None:
+def write_rows(
+    rows: list[dict[str, str]],
+) -> None:
     RESULTS_PATH.parent.mkdir(
         parents=True,
         exist_ok=True,
@@ -179,12 +180,16 @@ def next_experiment_number(
             "",
         )
 
-        if not experiment_id.startswith("bayes_"):
+        if not experiment_id.startswith(
+            "bayes_"
+        ):
             continue
 
         try:
             numbers.append(
-                int(experiment_id.split("_")[-1])
+                int(
+                    experiment_id.split("_")[-1]
+                )
             )
         except ValueError:
             continue
@@ -192,7 +197,17 @@ def next_experiment_number(
     return max(numbers, default=0) + 1
 
 
-def suggest_parameters(trial) -> dict[str, Any]:
+def suggest_parameters(
+    trial,
+) -> dict[str, Any]:
+    """
+    Ask Optuna for one runnable configuration.
+
+    Conditional branches expose only parameters that genuinely vary
+    within the currently runnable search space. Fixed implementation
+    choices are filled in directly rather than sampled.
+    """
+
     model_setting = trial.suggest_categorical(
         "model_setting",
         MODEL_SETTINGS,
@@ -212,10 +227,7 @@ def suggest_parameters(trial) -> dict[str, Any]:
         "fusion": None,
     }
 
-    if model_setting in {
-        "rna_only",
-        "multimodal",
-    }:
+    if model_setting == "rna_only":
         config["rna_encoder"] = (
             trial.suggest_categorical(
                 "rna_encoder",
@@ -223,34 +235,73 @@ def suggest_parameters(trial) -> dict[str, Any]:
             )
         )
 
-    if model_setting in {
-        "image_only",
-        "multimodal",
-    }:
+        if profile_setting == "multiprofile":
+            config["aggregation"] = (
+                trial.suggest_categorical(
+                    "aggregation",
+                    AGGREGATIONS,
+                )
+            )
+
+    elif model_setting == "image_only":
+        if profile_setting == "singleprofile":
+            config["image_encoder"] = (
+                trial.suggest_categorical(
+                    "image_encoder",
+                    IMAGE_ENCODERS,
+                )
+            )
+
+        else:
+            # ResNet50 multiprofile configs are not currently
+            # implemented, so ViT-L is the only runnable encoder.
+            config["image_encoder"] = (
+                "imagenet_vit_l"
+            )
+
+            config["aggregation"] = (
+                trial.suggest_categorical(
+                    "aggregation",
+                    AGGREGATIONS,
+                )
+            )
+
+    elif model_setting == "multimodal":
+        config["rna_encoder"] = (
+            trial.suggest_categorical(
+                "rna_encoder",
+                RNA_ENCODERS,
+            )
+        )
+
+        # These are currently the only implemented multimodal
+        # representation and fusion choices.
         config["image_encoder"] = (
-            trial.suggest_categorical(
-                "image_encoder",
-                IMAGE_ENCODERS,
-            )
+            "imagenet_vit_l"
         )
+        config["fusion"] = "concat"
 
-    if profile_setting == "multiprofile":
-        config["aggregation"] = (
-            trial.suggest_categorical(
-                "aggregation",
-                AGGREGATIONS,
-            )
-        )
-
-    if model_setting == "multimodal":
-        config["fusion"] = (
-            trial.suggest_categorical(
-                "fusion",
-                FUSIONS,
-            )
-        )
+        if profile_setting == "multiprofile":
+            # Multimodal Transformer aggregation is not yet
+            # implemented, so avgpool is currently fixed.
+            config["aggregation"] = "avgpool"
 
     validate_configuration(config)
+
+    runnable_keys = {
+        configuration_key(candidate)
+        for candidate
+        in generate_all_configurations(
+            runnable_only=True
+        )
+    }
+
+    if configuration_key(config) not in runnable_keys:
+        raise RuntimeError(
+            "Bayesian sampler produced a configuration "
+            "outside the runnable search space. "
+            f"Configuration: {config}"
+        )
 
     return config
 
@@ -258,65 +309,100 @@ def suggest_parameters(trial) -> dict[str, Any]:
 def trial_data_for_configuration(
     config: dict[str, Any],
 ):
+    """
+    Reconstruct the Optuna parameterization used for a completed
+    runnable configuration.
+
+    Only parameters that vary within that conditional branch are
+    included. Fixed implementation choices are deliberately omitted.
+    """
+
     from optuna.distributions import (
         CategoricalDistribution,
     )
 
     params = {
-        "model_setting": config["model_setting"],
-        "profile_setting": config["profile_setting"],
+        "model_setting": (
+            config["model_setting"]
+        ),
+        "profile_setting": (
+            config["profile_setting"]
+        ),
     }
 
     distributions = {
-        "model_setting": CategoricalDistribution(
-            choices=MODEL_SETTINGS
+        "model_setting": (
+            CategoricalDistribution(
+                choices=MODEL_SETTINGS
+            )
         ),
-        "profile_setting": CategoricalDistribution(
-            choices=PROFILE_SETTINGS
+        "profile_setting": (
+            CategoricalDistribution(
+                choices=PROFILE_SETTINGS
+            )
         ),
     }
 
-    if config["model_setting"] in {
-        "rna_only",
-        "multimodal",
-    }:
+    model_setting = config[
+        "model_setting"
+    ]
+    profile_setting = config[
+        "profile_setting"
+    ]
+
+    if model_setting == "rna_only":
         params["rna_encoder"] = (
             config["rna_encoder"]
         )
+
         distributions["rna_encoder"] = (
             CategoricalDistribution(
                 choices=RNA_ENCODERS
             )
         )
 
-    if config["model_setting"] in {
-        "image_only",
-        "multimodal",
-    }:
-        params["image_encoder"] = (
-            config["image_encoder"]
-        )
-        distributions["image_encoder"] = (
-            CategoricalDistribution(
-                choices=IMAGE_ENCODERS
+        if profile_setting == "multiprofile":
+            params["aggregation"] = (
+                config["aggregation"]
             )
+
+            distributions["aggregation"] = (
+                CategoricalDistribution(
+                    choices=AGGREGATIONS
+                )
+            )
+
+    elif model_setting == "image_only":
+        if profile_setting == "singleprofile":
+            params["image_encoder"] = (
+                config["image_encoder"]
+            )
+
+            distributions["image_encoder"] = (
+                CategoricalDistribution(
+                    choices=IMAGE_ENCODERS
+                )
+            )
+
+        else:
+            params["aggregation"] = (
+                config["aggregation"]
+            )
+
+            distributions["aggregation"] = (
+                CategoricalDistribution(
+                    choices=AGGREGATIONS
+                )
+            )
+
+    elif model_setting == "multimodal":
+        params["rna_encoder"] = (
+            config["rna_encoder"]
         )
 
-    if config["profile_setting"] == "multiprofile":
-        params["aggregation"] = (
-            config["aggregation"]
-        )
-        distributions["aggregation"] = (
+        distributions["rna_encoder"] = (
             CategoricalDistribution(
-                choices=AGGREGATIONS
-            )
-        )
-
-    if config["model_setting"] == "multimodal":
-        params["fusion"] = config["fusion"]
-        distributions["fusion"] = (
-            CategoricalDistribution(
-                choices=FUSIONS
+                choices=RNA_ENCODERS
             )
         )
 
@@ -331,6 +417,14 @@ def add_completed_trials(
     from optuna.trial import create_trial
 
     completed_count = 0
+
+    runnable_keys = {
+        configuration_key(config)
+        for config
+        in generate_all_configurations(
+            runnable_only=True
+        )
+    }
 
     for row in get_bayesian_rows(rows):
         if row.get("status") != "completed":
@@ -349,15 +443,27 @@ def add_completed_trials(
         except ValueError:
             continue
 
-        config = row_to_configuration(row)
+        config = row_to_configuration(
+            row
+        )
 
         try:
-            validate_configuration(config)
+            validate_configuration(
+                config
+            )
         except ValueError:
             continue
 
+        if (
+            configuration_key(config)
+            not in runnable_keys
+        ):
+            continue
+
         params, distributions = (
-            trial_data_for_configuration(config)
+            trial_data_for_configuration(
+                config
+            )
         )
 
         completed_trial = create_trial(
@@ -366,7 +472,10 @@ def add_completed_trials(
             value=score,
         )
 
-        study.add_trial(completed_trial)
+        study.add_trial(
+            completed_trial
+        )
+
         completed_count += 1
 
     return completed_count
@@ -403,10 +512,13 @@ def suggest_configuration(
         build_runnable_lookup()
     )
 
-    tested_keys = get_tested_keys(rows)
+    tested_keys = get_tested_keys(
+        rows
+    )
 
     available_keys = (
-        set(config_by_key) - tested_keys
+        set(config_by_key)
+        - tested_keys
     )
 
     if not available_keys:
@@ -432,23 +544,22 @@ def suggest_configuration(
     )
 
     maximum_attempts = max(
-        len(config_by_key) * 10,
-        100,
+        len(config_by_key) * 5,
+        50,
     )
 
-    for _ in range(maximum_attempts):
+    for _ in range(
+        maximum_attempts
+    ):
         trial = study.ask()
-        config = suggest_parameters(trial)
-        key = configuration_key(config)
 
-        if key not in config_by_key:
-            study.tell(
-                trial,
-                state=(
-                    optuna.trial.TrialState.PRUNED
-                ),
-            )
-            continue
+        config = suggest_parameters(
+            trial
+        )
+
+        key = configuration_key(
+            config
+        )
 
         if key in tested_keys:
             study.tell(
@@ -457,6 +568,7 @@ def suggest_configuration(
                     optuna.trial.TrialState.PRUNED
                 ),
             )
+
             continue
 
         return (
@@ -476,22 +588,38 @@ def make_result_row(
     experiment_number: int,
     completed_count: int,
 ) -> dict[str, str]:
-    validate_configuration(config)
+    validate_configuration(
+        config
+    )
 
     return {
         "experiment_id": (
             f"bayes_{experiment_number:03d}"
         ),
         "search_method": "bayesian",
-        "model_setting": config["model_setting"],
-        "profile_setting": config["profile_setting"],
-        "rna_encoder": config["rna_encoder"] or "",
+        "model_setting": (
+            config["model_setting"]
+        ),
+        "profile_setting": (
+            config["profile_setting"]
+        ),
+        "rna_encoder": (
+            config["rna_encoder"] or ""
+        ),
         "image_encoder": (
             config["image_encoder"] or ""
         ),
-        "aggregation": config["aggregation"] or "",
-        "fusion": config["fusion"] or "",
-        "experiment": build_experiment_name(config),
+        "aggregation": (
+            config["aggregation"] or ""
+        ),
+        "fusion": (
+            config["fusion"] or ""
+        ),
+        "experiment": (
+            build_experiment_name(
+                config
+            )
+        ),
         "status": "planned",
         "val_accuracy": "",
         "val_f1": "",
@@ -500,7 +628,8 @@ def make_result_row(
         "selection_reason": (
             "Optuna TPE suggestion based on "
             f"{completed_count} completed Bayesian "
-            "trial(s)."
+            "trial(s), restricted to the currently "
+            "runnable search space."
         ),
         "experiment_summary": "",
         "started_at": "",
@@ -515,8 +644,9 @@ def make_result_row(
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Add the next component-level Optuna "
-            "suggestion to the shared results file."
+            "Add the next runnable component-level "
+            "Optuna suggestion to the shared "
+            "results file."
         )
     )
 
@@ -524,7 +654,9 @@ def main() -> None:
         "--seed",
         type=int,
         default=42,
-        help="Seed used by the Optuna TPE sampler.",
+        help=(
+            "Seed used by the Optuna TPE sampler."
+        ),
     )
 
     parser.add_argument(
@@ -549,6 +681,15 @@ def main() -> None:
         ),
     )
 
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Generate and print the next suggestion "
+            "without modifying master_results.csv."
+        ),
+    )
+
     args = parser.parse_args()
 
     if args.startup_trials < 1:
@@ -569,8 +710,10 @@ def main() -> None:
         startup_trials=args.startup_trials,
     )
 
-    experiment_number = next_experiment_number(
-        rows
+    experiment_number = (
+        next_experiment_number(
+            rows
+        )
     )
 
     result_row = make_result_row(
@@ -578,9 +721,6 @@ def main() -> None:
         experiment_number=experiment_number,
         completed_count=completed_count,
     )
-
-    rows.append(result_row)
-    write_rows(rows)
 
     print(
         "Completed Bayesian observations available "
@@ -592,21 +732,45 @@ def main() -> None:
     )
 
     print(
-        f"Setting: {config['model_setting']} / "
+        f"Setting: "
+        f"{config['model_setting']} / "
         f"{config['profile_setting']}"
     )
 
-    print(f"Configuration: {config}")
-
     print(
-        f"Experiment: {result_row['experiment']}"
+        f"Configuration: {config}"
     )
 
     print(
-        f"Added as: {result_row['experiment_id']}"
+        f"Experiment: "
+        f"{result_row['experiment']}"
     )
 
-    print(f"\nResults file:\n{RESULTS_PATH}")
+    if args.dry_run:
+        print(
+            "\nDry run complete. "
+            "No experiment was added."
+        )
+
+        return
+
+    rows.append(
+        result_row
+    )
+
+    write_rows(
+        rows
+    )
+
+    print(
+        f"Added as: "
+        f"{result_row['experiment_id']}"
+    )
+
+    print(
+        f"\nResults file:\n"
+        f"{RESULTS_PATH}"
+    )
 
 
 if __name__ == "__main__":
