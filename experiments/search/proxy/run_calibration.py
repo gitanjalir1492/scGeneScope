@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-SEARCH_DIR = Path(__file__).resolve().parent
+SEARCH_DIR = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = SEARCH_DIR.parent.parent
 
 MASTER_RESULTS = (

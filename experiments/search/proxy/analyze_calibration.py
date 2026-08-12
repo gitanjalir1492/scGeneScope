@@ -4,7 +4,7 @@ from pathlib import Path
 from scipy.stats import spearmanr
 
 
-SEARCH_DIR = Path(__file__).resolve().parent
+SEARCH_DIR = Path(__file__).resolve().parent.parent
 
 MASTER_RESULTS = (
     SEARCH_DIR

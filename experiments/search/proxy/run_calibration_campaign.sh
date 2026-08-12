@@ -28,7 +28,7 @@ do
     echo "========================================"
 
     poetry run python \
-        experiments/search/run_proxy_calibration.py \
+        experiments/search/proxy/run_calibration.py \
         --experiment-id "$ID" \
         --gpu 0
 
@@ -38,4 +38,4 @@ done
 echo ""
 echo "All remaining proxy calibrations finished."
 
-poetry run python experiments/search/analyze_proxy.py
+poetry run python experiments/search/proxy/analyze_calibration.py
