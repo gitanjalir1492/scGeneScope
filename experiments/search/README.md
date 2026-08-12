@@ -1,14 +1,16 @@
-# Autonomous Search Framework
+# Autonomous Search Experiments
 
-This directory contains the autonomous search framework used to compare different strategies for exploring the scGeneScope model search space.
+This folder contains the search experiments I am using to explore the scGeneScope model space.
 
-The goal is to compare how efficiently different search strategies identify high-performing multimodal cellular profiling models under an identical experimental budget.
+The main goal is to compare different ways of choosing which model configuration to try next. I am comparing random search, Bayesian optimization, and two LLM-guided search strategies under the same experiment budget.
+
+The LLM experiments test whether an agent can use results from previous experiments to make useful decisions about what to run next.
 
 ---
 
-# Directory Overview
+# Files
 
-```
+```text
 experiments/search/
 │
 ├── random_search.py
@@ -19,302 +21,212 @@ experiments/search/
 ├── run_experiments.py
 ├── search_space.py
 ├── results_io.py
+├── analyze_search.py
 │
+├── proxy/
 ├── results/
-│   ├── master_results.csv
-│   └── backups/
-│
 ├── logs/
 └── runs/
 ```
 
----
+## `random_search.py`
 
-# Search Methods
+Randomly chooses an untested configuration from the runnable search space.
 
-## random_search.py
+I use this as the baseline for comparing the other search methods.
 
-Selects an untested runnable configuration uniformly at random.
+## `bayesian_search.py`
 
-Purpose:
+Uses Optuna TPE to choose experiments based on the validation results from previous Bayesian trials.
 
-- Random-search baseline
-- Reference point for evaluating more intelligent search strategies
+This gives me a standard optimization method to compare against both random search and the LLM approaches.
 
----
+## `llm_search.py`
 
-## bayesian_search.py
+Uses a fixed LLM (`openai_gpt54_mini`) to choose the next experiment.
 
-Uses Bayesian Optimization (Optuna) to select the next experiment using previous validation performance.
+I am testing two versions.
 
-Purpose:
+### Metrics only
 
-- Learn which regions of the search space appear promising
-- Balance exploration and exploitation
+The LLM sees the configurations and validation results from its previous experiments:
 
----
+- validation accuracy
+- validation F1
+- model configuration
 
-## llm_search.py
+### Metrics + summaries
 
-Uses a fixed language model (`openai_gpt54_mini`) to choose the next experiment.
+The LLM gets the same information, but also sees a short summary of what was learned from each previous experiment.
 
-Two memory conditions are supported.
+This lets me test whether giving the agent more context about previous results changes the experiments it chooses.
 
-### Metrics Memory
+For reproducibility, the prompt and raw response from each LLM decision are also saved.
 
-The model only receives previous validation metrics.
+## `summarize_experiment.py`
 
-```
-Validation Accuracy
-Validation F1
-Configuration
-```
+Generates the experiment summaries used by the LLM summary condition.
 
-### Summary Memory
+The summary describes what was tested, what the validation results suggest, and what is still uncertain.
 
-The model receives both validation metrics and scientific summaries generated from previous experiments.
+## `run_experiments.py`
 
-```
-Validation Accuracy
-Validation F1
-Experiment Summary
-```
+Runs a selected scGeneScope experiment and records its validation results.
 
-This allows comparison between numerical memory and higher-level scientific memory.
+## `run_search.py`
 
----
+Runs the search loop:
 
-## summarize_experiment.py
+1. choose the next configuration
+2. train it
+3. record the validation results
+4. update the search history
+5. repeat until the experiment budget is reached
 
-Generates a concise scientific summary after each completed `llm_summary` experiment.
+For the LLM summary condition, a summary is also generated after each completed experiment.
 
-Each summary describes:
+## `search_space.py`
 
-- what was tested
-- what the validation results suggest
-- remaining uncertainty
+Defines the configurations that can be explored.
 
-Summaries are stored inside
+The full target search space contains 51 valid configurations. Right now, 19 of these are runnable with the implementations currently available in scGeneScope.
 
-```
-results/master_results.csv
+The remaining configurations need additional support for ResNet50 combinations, weighted multimodal fusion, or multimodal Transformer aggregation.
+
+For the search comparison, every method uses:
+
+```python
+generate_all_configurations(runnable_only=True)
 ```
 
-and become memory for future LLM decisions.
-
----
-
-# Execution Scripts
-
-## run_experiments.py
-
-Runs a planned experiment.
-
-Responsibilities:
-
-- launches scGeneScope training
-- records validation metrics
-- updates the shared experiment table
+so they all choose from the same 19 configurations.
 
 ---
 
-## run_search.py
+# Search Comparison
 
-Runs a complete autonomous search loop.
+I am comparing four search conditions:
 
-Workflow:
+| Method | Information used to choose the next experiment |
+| --- | --- |
+| Random | None |
+| Bayesian | Previous validation results |
+| LLM Metrics | Previous validation results |
+| LLM Summary | Previous validation results + experiment summaries |
 
-1. Select next experiment
-2. Train model
-3. Record validation metrics
-4. Generate experiment summary (LLM Summary only)
-5. Repeat until the experiment budget is reached
+Each method gets the same search space, training setup, validation objective, and experiment budget.
 
-The search loop includes:
-
-- dry-run mode
-- GPU availability checks
-- automatic experiment summaries
-- automatic experiment bookkeeping
+The main question is whether the LLM-guided searches can find strong configurations with fewer experiments than random or Bayesian search.
 
 ---
 
-# Search Space
+# Proxy Experiments
 
-## search_space.py
+Some of the full scGeneScope experiments take several hours to train, especially the multi-profile and multimodal models. This makes it difficult to run many sequential search experiments.
 
-Defines every runnable configuration.
+I therefore use a shorter training run during the search:
 
-Each configuration specifies:
+- maximum 10 epochs
+- minimum 1 epoch
+- early stopping patience of 2
 
-- model setting
-- profile setting
-- RNA representation
-- image representation
-- aggregation method
-- fusion method
+Everything else about the configuration and validation setup stays the same.
 
-Every configuration receives a deterministic configuration ID so that all search methods evaluate exactly the same search space.
+The proxy score is only used to help the search methods choose experiments. Final configurations will still be trained normally before test evaluation.
 
----
+## Checking the Proxy
 
-# Results
+Before using the proxy for the search comparison, I compared it against the 10 full random-search experiments I had already run.
 
-```
-results/
-```
+Across those 10 configurations:
 
-Contains the shared experiment table used by every search strategy.
+- mean absolute validation accuracy error: **0.0160**
+- Spearman rank correlation: **0.8667**
+- p-value: **0.001174**
 
-```
-master_results.csv
-```
+The proxy also kept the same top three configurations in the same order.
 
-Stores
+This was strong enough to use the shorter runs for the search stage while keeping full training for the final evaluation.
 
-- experiment metadata
-- validation metrics
-- test metrics
-- experiment summaries
-- execution information
+The calibration code is in:
 
-```
-backups/
+```text
+proxy/run_calibration.py
+proxy/analyze_calibration.py
 ```
 
-Contains timestamped backups created before search resets.
+and the results are stored in:
 
----
-
-# Logs
-
-```
-logs/
-```
-
-Contains training logs produced during experiment execution.
-
----
-
-# Runs
-
-```
-runs/
-```
-
-Contains Hydra output directories for completed training runs.
-
----
-
-# Typical Commands
-
-Generate one random proposal
-
-```bash
-python random_search.py
-```
-
-Generate one Bayesian proposal
-
-```bash
-python bayesian_search.py
-```
-
-Generate one LLM proposal
-
-```bash
-python llm_search.py \
-    --memory-mode metrics \
-    --call-api
-```
-
-Preview an autonomous search
-
-```bash
-python run_search.py \
-    --method llm_metrics \
-    --budget 5 \
-    --gpu 2
-```
-
-Execute an autonomous search
-
-```bash
-python run_search.py \
-    --method llm_metrics \
-    --budget 5 \
-    --gpu 2 \
-    --execute
+```text
+results/proxy_results.csv
 ```
 
 ---
 
-# Search Strategies
+# Proxy Search Comparison
 
-| Method | Memory | Decision Mechanism |
-|----------|--------|--------------------|
-| Random | None | Uniform random sampling |
-| Bayesian | Validation metrics | Bayesian optimization (Optuna) |
-| LLM Metrics | Validation metrics | Fixed LLM reasoning |
-| LLM Summary | Validation metrics + scientific summaries | Fixed LLM reasoning with structured scientific memory |
+The main search comparison uses the same proxy setup for all four methods:
 
-All search methods evaluate the same search space, use the same training pipeline, and are compared under an identical experimental budget.
+- Random
+- Bayesian
+- LLM Metrics
+- LLM Summary
 
-The objective is to determine whether LLM-guided sequential experimentation can discover stronger model configurations more efficiently than conventional search strategies.
+Each method gets:
+
+- the same 19 runnable configurations
+- the same 10-epoch maximum
+- the same early stopping setup
+- the same validation objective
+- the same experiment budget
+- no access to the held-out test results during search
+
+The 10 Random proxy results come from the proxy calibration runs, so I reuse those results instead of training the same configurations again.
+
+The search results are stored in:
+
+```text
+results/proxy_search_results.csv
+```
 
 ---
 
-# Proxy Evaluation and Fast AutoResearch
+# Results Files
 
-Full scGeneScope training can take several hours for some multi-profile and multimodal configurations, making rapid sequential AutoResearch iteration impractical.
+### `results/master_results.csv`
 
-To support faster search, the framework uses a shortened proxy evaluation protocol:
+Full training experiments.
 
-- Maximum epochs: 10
-- Minimum epochs: 1
-- Early-stopping patience: 2
-- Same model configuration, data pipeline, validation split, and training code as the full experiment
+### `results/proxy_results.csv`
 
-## Proxy Calibration
+The proxy runs used to compare short training against full training.
 
-Proxy calibration utilities are stored in `proxy/run_calibration.py` and `proxy/analyze_calibration.py`.
+### `results/proxy_search_results.csv`
 
-Calibration results are stored in `results/proxy_results.csv`.
+The experiments used for the Random vs Bayesian vs LLM search comparison.
 
-The proxy was calibrated against 10 completed full-fidelity random-search experiments. Across these 10 matched configurations, the proxy achieved a mean absolute validation-accuracy error of 0.0160 and a Spearman rank correlation of 0.8667 (p = 0.001174). The three highest-performing configurations were preserved in the same order.
+---
 
-The proxy is therefore used as a search-time feedback signal rather than as a replacement for final full-fidelity evaluation.
+# Analysis
 
-## Controlled Proxy Search
+`analyze_search.py` compares the search methods as experiments finish.
 
-The controlled fast-search trajectories are stored separately in `results/proxy_search_results.csv`.
+It produces:
 
-The search stack uses `SCGENESCOPE_RESULTS_PATH` to select the active results table. If the variable is not set, the default remains `results/master_results.csv`.
+```text
+analysis/
+├── search_curves.csv
+├── search_summary.csv
+├── best_validation_vs_trial.png
+└── best_validation_vs_runtime.png
+```
 
-The proxy-search comparison evaluates Random, Bayesian, LLM metrics-only, and LLM metrics + experiment summaries under the same conditions:
+The main comparison is best validation accuracy found versus number of experiments run. I also track performance against total proxy training time.
 
-- Same 19 currently runnable configurations
-- Same 10-epoch proxy evaluator
-- Same validation objective
-- Same experimental budget
-- No held-out test-set access during search
+---
 
-Random proxy-search results are seeded from the completed calibration runs rather than unnecessarily retraining the same configurations.
+# Final Evaluation
 
-## Search-Space Status
+The proxy runs are for choosing configurations, not for reporting final model performance.
 
-The conceptual target search space contains 51 valid configurations, of which 19 are currently runnable and 32 require additional implementation.
-
-The remaining implementation categories include broader ResNet50 support, weighted multimodal fusion, and multimodal Transformer aggregation.
-
-All search strategies use `generate_all_configurations(runnable_only=True)`, ensuring that they receive the same feasible candidate space.
-
-## Results Organization
-
-- `results/master_results.csv` - full-fidelity experiments
-- `results/proxy_results.csv` - proxy calibration against full-fidelity experiments
-- `results/proxy_search_results.csv` - controlled fast AutoResearch trajectories
-
-After proxy search is complete, the strongest selected configurations should be retrained using the full-fidelity protocol before final held-out test evaluation.
-
-For LLM-guided experiments, the exact prompt and raw model response should also be retained for every decision so that the agent reasoning can be reconstructed and audited.
+After the search experiments are complete, the strongest configurations found by each method will be trained using the full training setup. The held-out test set will only be used for this final evaluation.
