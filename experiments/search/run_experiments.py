@@ -83,14 +83,26 @@ def build_command(
     experiment: str,
     python_executable: str,
     run_directory: Path,
+    proxy: bool = False,
 ) -> list[str]:
-    return [
+    command = [
         python_executable,
         str(TRAIN_SCRIPT),
         f"experiment={experiment}",
         f"hydra.run.dir={run_directory}",
         "test=false",
     ]
+
+    if proxy:
+        command.extend(
+            [
+                "trainer.max_epochs=10",
+                "trainer.min_epochs=1",
+                "callbacks.early_stopping.patience=2",
+            ]
+        )
+
+    return command
 
 
 def select_planned_experiment(
@@ -228,6 +240,7 @@ def run_experiment(
     row: dict[str, str],
     rows: list[dict[str, str]],
     python_executable: str,
+    proxy: bool = False,
 ) -> None:
     LOG_DIRECTORY.mkdir(
         parents=True,
@@ -259,13 +272,35 @@ def run_experiment(
         experiment=row["experiment"],
         python_executable=python_executable,
         run_directory=run_directory,
+        proxy=proxy,
     )
 
-    print("\nExecuting command:\n")
-    print(subprocess.list2cmdline(command))
+    print("\nSelected experiment:")
+    print(f"ID: {experiment_id}")
+    print(f"Method: {row['search_method']}")
+    print(
+        "Setting: "
+        f"{row['model_setting']} / "
+        f"{row['profile_setting']}"
+    )
+    print(f"Experiment: {row['experiment']}")
 
-    print(f"\nRun directory:\n{run_directory}")
-    print(f"\nLog file:\n{log_path}\n")
+    if proxy:
+        print("Mode: PROXY")
+        print(
+            "Proxy overrides: "
+            "max_epochs=10, min_epochs=1, "
+            "early_stopping.patience=2"
+        )
+
+    print("\nCommand that will be executed:\n")
+    print(" ".join(command))
+
+    print("\nRun directory:")
+    print(run_directory)
+
+    print("\nLog file:")
+    print(log_path)
 
     row["status"] = "running"
     row["started_at"] = datetime.now().isoformat(
@@ -273,112 +308,124 @@ def run_experiment(
     )
     row["finished_at"] = ""
     row["return_code"] = ""
-    row["run_directory"] = str(
-        run_directory
-    )
+    row["run_directory"] = str(run_directory)
     row["log_file"] = str(log_path)
     row["error_message"] = ""
-    row["val_accuracy"] = ""
-    row["val_f1"] = ""
 
     write_results(rows)
 
-    try:
-        with log_path.open(
-            "w",
-            encoding="utf-8",
-        ) as log_file:
-            result = subprocess.run(
-                command,
-                cwd=PROJECT_ROOT,
-                stdout=log_file,
-                stderr=subprocess.STDOUT,
-                text=True,
-                check=False,
-            )
-
-        row["return_code"] = str(
-            result.returncode
+    with log_path.open(
+        "w",
+        encoding="utf-8",
+    ) as logfile:
+        result = subprocess.run(
+            command,
+            cwd=PROJECT_ROOT,
+            stdout=logfile,
+            stderr=subprocess.STDOUT,
+            text=True,
         )
 
-        row["finished_at"] = (
-            datetime.now().isoformat(
-                timespec="seconds"
-            )
-        )
+    row["return_code"] = str(
+        result.returncode
+    )
+    row["finished_at"] = datetime.now().isoformat(
+        timespec="seconds"
+    )
 
-        if result.returncode != 0:
-            row["status"] = "failed"
-            row["error_message"] = (
-                "Training returned exit code "
-                f"{result.returncode}."
-            )
-
-            print(
-                f"Experiment {experiment_id} failed "
-                f"with exit code {result.returncode}."
-            )
-
-            return
-
-        metrics_path = find_metrics_file(
-            run_directory
-        )
-
-        val_accuracy, val_f1 = (
-            read_validation_metrics(
-                metrics_path
-            )
-        )
-
-        row["val_accuracy"] = str(
-            val_accuracy
-        )
-
-        if val_f1 is not None:
-            row["val_f1"] = str(val_f1)
-
-        row["status"] = "completed"
-
-        print(
-            f"Experiment {experiment_id} "
-            "completed successfully."
-        )
-
-        print(
-            f"Validation accuracy: "
-            f"{row['val_accuracy']}"
-        )
-
-        print(
-            f"Validation F1: "
-            f"{row['val_f1'] or 'not found'}"
-        )
-
-        print(
-            f"Metrics file: {metrics_path}"
-        )
-
-    except Exception as error:
+    if result.returncode != 0:
         row["status"] = "failed"
-
-        row["finished_at"] = (
-            datetime.now().isoformat(
-                timespec="seconds"
-            )
+        row["error_message"] = (
+            f"Training returned exit code "
+            f"{result.returncode}."
         )
-
-        row["error_message"] = str(error)
-
-        print(
-            f"Experiment {experiment_id} "
-            "could not be completed:"
-        )
-
-        print(error)
-
-    finally:
         write_results(rows)
+
+        raise RuntimeError(
+            f"Experiment {experiment_id} failed "
+            f"with exit code {result.returncode}."
+        )
+
+    metrics_path = find_metrics_file(
+        run_directory
+    )
+
+    val_accuracy, val_f1 = (
+        read_validation_metrics(
+            metrics_path
+        )
+    )
+
+    row["status"] = "completed"
+    row["val_accuracy"] = str(
+        val_accuracy
+    )
+    row["val_f1"] = (
+        ""
+        if val_f1 is None
+        else str(val_f1)
+    )
+    row["error_message"] = ""
+
+    write_results(rows)
+
+    print(
+        f"\nExperiment {experiment_id} "
+        "completed successfully."
+    )
+    print(
+        f"Validation accuracy: "
+        f"{val_accuracy}"
+    )
+    print(
+        f"Validation F1: "
+        f"{val_f1}"
+    )
+    print(
+        f"Metrics file: "
+        f"{metrics_path}"
+    )
+
+
+def preview_experiment(
+    row: dict[str, str],
+    python_executable: str,
+    proxy: bool = False,
+) -> None:
+    preview_directory = (
+        RUN_DIRECTORY
+        / f"{row['experiment_id']}_TIMESTAMP"
+    ).resolve()
+
+    command = build_command(
+        experiment=row["experiment"],
+        python_executable=python_executable,
+        run_directory=preview_directory,
+        proxy=proxy,
+    )
+
+    print("\nSelected experiment:")
+    print(f"ID: {row['experiment_id']}")
+    print(f"Method: {row['search_method']}")
+    print(
+        "Setting: "
+        f"{row['model_setting']} / "
+        f"{row['profile_setting']}"
+    )
+    print(f"Experiment: {row['experiment']}")
+
+    if proxy:
+        print("Mode: PROXY")
+
+    print("\nCommand that will be executed:\n")
+    print(" ".join(command))
+
+    print(
+        "\nNote: test=false is used during "
+        "search. The held-out test set is "
+        "evaluated only after selecting the "
+        "best model."
+    )
 
 
 def main() -> None:
@@ -417,93 +464,44 @@ def main() -> None:
         ),
     )
 
+    parser.add_argument(
+        "--proxy",
+        action="store_true",
+        help=(
+            "Run a shortened proxy evaluation "
+            "using 10 max epochs and early "
+            "stopping patience 2."
+        ),
+    )
+
     args = parser.parse_args()
 
     rows = read_results()
 
-    planned_count = sum(
-        row.get("status") == "planned"
-        for row in rows
+    row = select_planned_experiment(
+        rows=rows,
+        experiment_id=args.experiment_id,
     )
-
-    print(f"Project root:\n{PROJECT_ROOT}\n")
-    print(f"Training script:\n{TRAIN_SCRIPT}\n")
-    print(f"Python:\n{args.python}\n")
-
-    print(
-        f"Found {planned_count} "
-        "planned experiments.\n"
-    )
-
-    try:
-        row = select_planned_experiment(
-            rows,
-            experiment_id=args.experiment_id,
-        )
-    except ValueError as error:
-        parser.error(str(error))
 
     if row is None:
         print(
-            "There are no planned experiments "
-            "to run."
+            "No planned experiments were found."
         )
         return
 
-    preview_directory = (
-        RUN_DIRECTORY
-        / f"{row['experiment_id']}_TIMESTAMP"
-    ).resolve()
-
-    command = build_command(
-        experiment=row["experiment"],
-        python_executable=args.python,
-        run_directory=preview_directory,
-    )
-
-    print("Selected experiment:")
-    print(f"ID: {row['experiment_id']}")
-    print(f"Method: {row['search_method']}")
-
-    print(
-        f"Setting: {row['model_setting']} / "
-        f"{row['profile_setting']}"
-    )
-
-    print(f"Experiment: {row['experiment']}")
-
-    selection_reason = row.get(
-        "selection_reason",
-        "",
-    ).strip()
-
-    if selection_reason:
-        print(
-            f"Selection reason: "
-            f"{selection_reason}"
+    if args.execute:
+        run_experiment(
+            row=row,
+            rows=rows,
+            python_executable=args.python,
+            proxy=args.proxy,
         )
-
-    print("\nCommand that will be executed:\n")
-    print(subprocess.list2cmdline(command))
-
-    print(
-        "\nNote: test=false is used during search. "
-        "The held-out test set is evaluated only "
-        "after selecting the best model."
-    )
-
-    if not args.execute:
-        print(
-            "\nDry run complete. "
-            "No experiment was started."
+    else:
+        preview_experiment(
+            row=row,
+            python_executable=args.python,
+            proxy=args.proxy,
         )
-        return
-
-    run_experiment(
-        row=row,
-        rows=rows,
-        python_executable=args.python,
-    )
 
 
 if __name__ == "__main__":

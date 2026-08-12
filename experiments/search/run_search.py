@@ -308,6 +308,7 @@ def propose_next(
 def execute_experiment(
     experiment_id: str,
     gpu: int,
+    proxy: bool = False,
 ) -> None:
     assert_gpu_available(
         gpu
@@ -324,6 +325,9 @@ def execute_experiment(
         experiment_id,
         "--execute",
     ]
+
+    if proxy:
+        command.append("--proxy")
 
     run_command(
         command,
@@ -414,6 +418,10 @@ def dry_run(
     print(f"Target budget: {budget}")
     print(f"GPU: {gpu}")
     print(
+        "Evaluation mode: "
+        + ("PROXY" if proxy else "FULL")
+    )
+    print(
         f"Already completed: "
         f"{len(completed)}"
     )
@@ -497,6 +505,7 @@ def run_search(
     method: str,
     budget: int,
     gpu: int,
+    proxy: bool = False,
 ) -> None:
     print(
         f"Starting autonomous {method} search."
@@ -568,6 +577,7 @@ def run_search(
         execute_experiment(
             experiment_id=experiment_id,
             gpu=gpu,
+            proxy=proxy,
         )
 
         rows = load_results()
@@ -702,6 +712,16 @@ def main() -> None:
         ),
     )
 
+    parser.add_argument(
+        "--proxy",
+        action="store_true",
+        help=(
+            "Use shortened proxy training during "
+            "search: 10 max epochs and early "
+            "stopping patience 2."
+        ),
+    )
+
     args = parser.parse_args()
 
     if args.budget < 1:
@@ -719,6 +739,7 @@ def main() -> None:
             method=args.method,
             budget=args.budget,
             gpu=args.gpu,
+            proxy=args.proxy,
         )
 
     else:
