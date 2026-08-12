@@ -2,6 +2,7 @@ import argparse
 import csv
 import json
 from pathlib import Path
+import os
 
 from search_space import (
     build_experiment_name,
@@ -12,7 +13,12 @@ from results_io import atomic_write_csv
 
 
 SEARCH_DIR = Path(__file__).resolve().parent
-RESULTS_PATH = SEARCH_DIR / "results" / "master_results.csv"
+RESULTS_PATH = Path(
+    os.environ.get(
+        "SCGENESCOPE_RESULTS_PATH",
+        SEARCH_DIR / "results" / "master_results.csv",
+    )
+).resolve()
 
 # Keep this fixed for every LLM search condition so that the only
 # experimental difference is the memory supplied to the model.

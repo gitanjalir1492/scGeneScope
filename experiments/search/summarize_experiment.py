@@ -2,13 +2,19 @@ import argparse
 import csv
 import json
 from pathlib import Path
+import os
 
 from llm_search import LLM_MODEL
 from results_io import atomic_write_csv
 
 
 SEARCH_DIR = Path(__file__).resolve().parent
-RESULTS_PATH = SEARCH_DIR / "results" / "master_results.csv"
+RESULTS_PATH = Path(
+    os.environ.get(
+        "SCGENESCOPE_RESULTS_PATH",
+        SEARCH_DIR / "results" / "master_results.csv",
+    )
+).resolve()
 
 FIELDS = [
     "experiment_id",

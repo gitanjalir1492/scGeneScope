@@ -2,6 +2,7 @@ import argparse
 import csv
 from pathlib import Path
 from typing import Any
+import os
 
 from search_space import (
     AGGREGATIONS,
@@ -17,7 +18,12 @@ from results_io import atomic_write_csv
 
 
 SEARCH_DIRECTORY = Path(__file__).resolve().parent
-RESULTS_PATH = SEARCH_DIRECTORY / "results" / "master_results.csv"
+RESULTS_PATH = Path(
+    os.environ.get(
+        "SCGENESCOPE_RESULTS_PATH",
+        SEARCH_DIRECTORY / "results" / "master_results.csv",
+    )
+).resolve()
 
 FIELDNAMES = [
     "experiment_id",

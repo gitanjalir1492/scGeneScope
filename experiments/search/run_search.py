@@ -7,7 +7,12 @@ from pathlib import Path
 
 
 SEARCH_DIR = Path(__file__).resolve().parent
-RESULTS_PATH = SEARCH_DIR / "results" / "master_results.csv"
+RESULTS_PATH = Path(
+    os.environ.get(
+        "SCGENESCOPE_RESULTS_PATH",
+        SEARCH_DIR / "results" / "master_results.csv",
+    )
+).resolve()
 
 RANDOM_SCRIPT = SEARCH_DIR / "random_search.py"
 BAYESIAN_SCRIPT = SEARCH_DIR / "bayesian_search.py"
@@ -399,6 +404,7 @@ def dry_run(
     method: str,
     budget: int,
     gpu: int,
+    proxy: bool = False,
 ) -> None:
     rows = load_results()
 
@@ -747,6 +753,7 @@ def main() -> None:
             method=args.method,
             budget=args.budget,
             gpu=args.gpu,
+            proxy=args.proxy,
         )
 
 
