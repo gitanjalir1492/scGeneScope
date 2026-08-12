@@ -20,6 +20,8 @@ RESULTS_PATH = Path(
     )
 ).resolve()
 
+LLM_LOG_DIR = SEARCH_DIR / "llm_logs"
+
 # Keep this fixed for every LLM search condition so that the only
 # experimental difference is the memory supplied to the model.
 LLM_MODEL = "openai_gpt54_mini"
@@ -479,6 +481,60 @@ def make_row(
     }
 
 
+
+def save_decision_artifacts(
+    experiment_id: str,
+    prompt: str,
+    response_text: str,
+    memory_mode: str,
+    config_id: str,
+    config: dict,
+    reason: str,
+    experiment: str,
+) -> None:
+    """Save the exact LLM decision context for reproducibility."""
+
+    decision_directory = (
+        LLM_LOG_DIR / experiment_id
+    )
+
+    decision_directory.mkdir(
+        parents=True,
+        exist_ok=False,
+    )
+
+    (decision_directory / "prompt.txt").write_text(
+        prompt,
+        encoding="utf-8",
+    )
+
+    (decision_directory / "raw_response.txt").write_text(
+        response_text,
+        encoding="utf-8",
+    )
+
+    decision = {
+        "experiment_id": experiment_id,
+        "model": LLM_MODEL,
+        "memory_mode": memory_mode,
+        "configuration_id": config_id,
+        "configuration": config,
+        "reason": reason,
+        "experiment": experiment,
+        "results_path": str(RESULTS_PATH),
+    }
+
+    (decision_directory / "decision.json").write_text(
+        json.dumps(decision, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    print(
+        "Saved LLM decision artifacts to "
+        f"{decision_directory}"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
@@ -615,6 +671,18 @@ def main() -> None:
         search_method,
         reason,
         number,
+    )
+
+
+    save_decision_artifacts(
+        experiment_id=row["experiment_id"],
+        prompt=prompt,
+        response_text=response_text,
+        memory_mode=args.memory_mode,
+        config_id=config_id,
+        config=config,
+        reason=reason,
+        experiment=row["experiment"],
     )
 
     rows.append(row)

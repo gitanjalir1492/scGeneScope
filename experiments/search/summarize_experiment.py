@@ -308,7 +308,7 @@ def main():
         action="store_true",
         help=(
             "Print the prompt without calling the API "
-            "or modifying master_results.csv."
+            "or modifying the active results file."
         ),
     )
 
@@ -350,7 +350,7 @@ def main():
         print(prompt)
         print(
             "\nDry run complete. No API call was made "
-            "and master_results.csv was not modified."
+            "and the active results file was not modified."
         )
         return
 

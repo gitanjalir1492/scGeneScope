@@ -497,7 +497,7 @@ def dry_run(
 
     print(
         "\nAfter each successful experiment, "
-        "the loop would reload master_results.csv "
+        "the loop would reload the active results file "
         "and continue until the budget is reached."
     )
 
@@ -599,7 +599,7 @@ def run_search(
         if not updated_rows:
             raise RuntimeError(
                 "Experiment disappeared from "
-                "master_results.csv."
+                "the active results file."
             )
 
         updated_row = updated_rows[0]

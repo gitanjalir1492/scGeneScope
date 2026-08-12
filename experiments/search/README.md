@@ -261,3 +261,60 @@ python run_search.py \
 All search methods evaluate the same search space, use the same training pipeline, and are compared under an identical experimental budget.
 
 The objective is to determine whether LLM-guided sequential experimentation can discover stronger model configurations more efficiently than conventional search strategies.
+
+---
+
+# Proxy Evaluation and Fast AutoResearch
+
+Full scGeneScope training can take several hours for some multi-profile and multimodal configurations, making rapid sequential AutoResearch iteration impractical.
+
+To support faster search, the framework uses a shortened proxy evaluation protocol:
+
+- Maximum epochs: 10
+- Minimum epochs: 1
+- Early-stopping patience: 2
+- Same model configuration, data pipeline, validation split, and training code as the full experiment
+
+## Proxy Calibration
+
+Proxy calibration utilities are stored in `proxy/run_calibration.py` and `proxy/analyze_calibration.py`.
+
+Calibration results are stored in `results/proxy_results.csv`.
+
+The proxy was calibrated against 10 completed full-fidelity random-search experiments. Across these 10 matched configurations, the proxy achieved a mean absolute validation-accuracy error of 0.0160 and a Spearman rank correlation of 0.8667 (p = 0.001174). The three highest-performing configurations were preserved in the same order.
+
+The proxy is therefore used as a search-time feedback signal rather than as a replacement for final full-fidelity evaluation.
+
+## Controlled Proxy Search
+
+The controlled fast-search trajectories are stored separately in `results/proxy_search_results.csv`.
+
+The search stack uses `SCGENESCOPE_RESULTS_PATH` to select the active results table. If the variable is not set, the default remains `results/master_results.csv`.
+
+The proxy-search comparison evaluates Random, Bayesian, LLM metrics-only, and LLM metrics + experiment summaries under the same conditions:
+
+- Same 19 currently runnable configurations
+- Same 10-epoch proxy evaluator
+- Same validation objective
+- Same experimental budget
+- No held-out test-set access during search
+
+Random proxy-search results are seeded from the completed calibration runs rather than unnecessarily retraining the same configurations.
+
+## Search-Space Status
+
+The conceptual target search space contains 51 valid configurations, of which 19 are currently runnable and 32 require additional implementation.
+
+The remaining implementation categories include broader ResNet50 support, weighted multimodal fusion, and multimodal Transformer aggregation.
+
+All search strategies use `generate_all_configurations(runnable_only=True)`, ensuring that they receive the same feasible candidate space.
+
+## Results Organization
+
+- `results/master_results.csv` - full-fidelity experiments
+- `results/proxy_results.csv` - proxy calibration against full-fidelity experiments
+- `results/proxy_search_results.csv` - controlled fast AutoResearch trajectories
+
+After proxy search is complete, the strongest selected configurations should be retrained using the full-fidelity protocol before final held-out test evaluation.
+
+For LLM-guided experiments, the exact prompt and raw model response should also be retained for every decision so that the agent reasoning can be reconstructed and audited.

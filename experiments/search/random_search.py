@@ -295,7 +295,7 @@ def main() -> None:
         help=(
             "Show the random experiment(s) that "
             "would be added without modifying "
-            "master_results.csv."
+            "the active results file."
         ),
     )
 

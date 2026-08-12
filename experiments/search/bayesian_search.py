@@ -681,7 +681,7 @@ def main() -> None:
         action="store_true",
         help=(
             "Generate and print the next suggestion "
-            "without modifying master_results.csv."
+            "without modifying the active results file."
         ),
     )
 
