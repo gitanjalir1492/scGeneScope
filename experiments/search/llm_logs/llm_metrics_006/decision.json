@@ -1,0 +1,17 @@
+{
+  "experiment_id": "llm_metrics_006",
+  "model": "openai_gpt54_mini",
+  "memory_mode": "metrics",
+  "configuration_id": "config_002",
+  "configuration": {
+    "model_setting": "rna_only",
+    "profile_setting": "multiprofile",
+    "rna_encoder": "pca_n2000",
+    "image_encoder": null,
+    "aggregation": "avgpool",
+    "fusion": null
+  },
+  "reason": "Evidence so far shows multiprofile is helpful for RNA-only models, but the gain may depend on the RNA encoder: scvi_n200 with avgpool is best observed so far, while pca_n2000 singleprofile is much weaker and we have no direct test of whether multiprofile itself helps when the encoder is fixed to pca. This experiment isolates the effect of aggregation/profile setting under a simpler encoder, clarifying whether the multiprofile improvement is robust or encoder-specific. It is the best next use of budget because it answers an important unresolved design question with only one change, rather than jumping to a more complex multimodal setup before understanding the RNA-only baseline more fully.",
+  "experiment": "rnaseq/multiprofile/train_avgpool_on_pca_n2000",
+  "results_path": "/homes/55/gitanjali/scGeneScope/experiments/search/results/proxy_search_results.csv"
+}

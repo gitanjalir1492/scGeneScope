@@ -1,0 +1,17 @@
+{
+  "experiment_id": "llm_metrics_007",
+  "model": "openai_gpt54_mini",
+  "memory_mode": "metrics",
+  "configuration_id": "config_009",
+  "configuration": {
+    "model_setting": "rna_only",
+    "profile_setting": "multiprofile",
+    "rna_encoder": "scgpt",
+    "image_encoder": null,
+    "aggregation": "transformer",
+    "fusion": null
+  },
+  "reason": "Evidence so far shows scvi_n200 is the strongest RNA encoder among the tested single-profile and multiprofile baselines, and multiprofile avgpool outperforms transformer for both pca_n2000 and scvi_n200. What remains uncertain is whether the poorer scgpt encoder can benefit from the same multiprofile setting, and whether its fusion behavior differs from the other encoders. This experiment tests that design choice in isolation by holding profile setting and aggregation fixed while changing only the RNA encoder. It is the best use of the next trial because it directly clarifies an important unresolved factor with a simple, informative comparison, while staying close to the current best-performing RNA-only setup.",
+  "experiment": "rnaseq/multiprofile/train_transformerpool_on_scgpt",
+  "results_path": "/homes/55/gitanjali/scGeneScope/experiments/search/results/proxy_search_results.csv"
+}

@@ -1,0 +1,17 @@
+{
+  "experiment_id": "llm_metrics_009",
+  "model": "openai_gpt54_mini",
+  "memory_mode": "metrics",
+  "configuration_id": "config_008",
+  "configuration": {
+    "model_setting": "rna_only",
+    "profile_setting": "multiprofile",
+    "rna_encoder": "scgpt",
+    "image_encoder": null,
+    "aggregation": "avgpool",
+    "fusion": null
+  },
+  "reason": "Existing evidence strongly favors RNA-only multiprofile over singleprofile, but the best RNA encoder is still uncertain: scvi_n200 is best so far, while scgpt performed poorly in singleprofile and has not been tested in the strongest multiprofile avgpool setting. This experiment isolates the effect of switching the RNA encoder from scvi_n200 to scgpt while keeping the high-performing multiprofile avgpool design fixed. It is the best next use of budget because it directly tests whether the poor scgpt results are due to the encoder itself or the earlier aggregation/profile choices, without changing multiple factors at once.",
+  "experiment": "rnaseq/multiprofile/train_avgpool_on_scgpt",
+  "results_path": "/homes/55/gitanjali/scGeneScope/experiments/search/results/proxy_search_results.csv"
+}

@@ -1,0 +1,17 @@
+{
+  "experiment_id": "llm_summary_005",
+  "model": "openai_gpt54_mini",
+  "memory_mode": "summary",
+  "configuration_id": "config_007",
+  "configuration": {
+    "model_setting": "rna_only",
+    "profile_setting": "singleprofile",
+    "rna_encoder": "scgpt",
+    "image_encoder": null,
+    "aggregation": null,
+    "fusion": null
+  },
+  "reason": "Existing evidence shows scvi_n200 is the strongest RNA-only representation so far, and multiprofile avgpool already outperforms singleprofile/transformer, but we still do not know whether these gains generalize to a better RNA encoder. This experiment tests scgpt in the simplest RNA-only singleprofile setting, isolating the effect of representation before adding profile aggregation or multimodal complexity. Under a limited budget, that is the best next step because it most directly answers whether the current best-performing trend is tied to scvi_n200 or whether a stronger encoder can further improve the baseline.",
+  "experiment": "rnaseq/singleprofile/train_on_scgpt",
+  "results_path": "/homes/55/gitanjali/scGeneScope/experiments/search/results/proxy_search_results.csv"
+}

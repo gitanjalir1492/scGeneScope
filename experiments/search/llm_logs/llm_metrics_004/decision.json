@@ -1,0 +1,17 @@
+{
+  "experiment_id": "llm_metrics_004",
+  "model": "openai_gpt54_mini",
+  "memory_mode": "metrics",
+  "configuration_id": "config_005",
+  "configuration": {
+    "model_setting": "rna_only",
+    "profile_setting": "multiprofile",
+    "rna_encoder": "scvi_n200",
+    "image_encoder": null,
+    "aggregation": "avgpool",
+    "fusion": null
+  },
+  "reason": "The strongest current result is RNA-only with scVI (config_004), while pca and scGPT both underperform in singleprofile settings, so the main uncertainty is whether the RNA encoding choice still matters once we move to multiprofile aggregation. This experiment tests the scVI encoder under the same multiprofile+avgpool setup as config_002/003 will test for pca, helping isolate the effect of representation from the effect of profile aggregation. It is the best next use of budget because it exploits the most promising RNA encoder so far while making a clean, informative comparison about whether multiprofile aggregation adds value for the best-performing representation.",
+  "experiment": "rnaseq/multiprofile/train_avgpool_on_scvi_n200",
+  "results_path": "/homes/55/gitanjali/scGeneScope/experiments/search/results/proxy_search_results.csv"
+}

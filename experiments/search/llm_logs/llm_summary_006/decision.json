@@ -1,0 +1,17 @@
+{
+  "experiment_id": "llm_summary_006",
+  "model": "openai_gpt54_mini",
+  "memory_mode": "summary",
+  "configuration_id": "config_010",
+  "configuration": {
+    "model_setting": "image_only",
+    "profile_setting": "singleprofile",
+    "rna_encoder": null,
+    "image_encoder": "resnet50",
+    "aggregation": null,
+    "fusion": null
+  },
+  "reason": "Existing evidence strongly favors RNA-only scvi_n200 multiprofile over simpler RNA baselines, but we still have no information on whether image features are useful at all. This experiment tests an image-only singleprofile baseline with a strong off-the-shelf encoder (resnet50), which clarifies the standalone value of morphology and gives a clean point of comparison for future multimodal choices. Under the limited budget, it is the best next step because it explores a major missing modality without changing RNA representation, profile complexity, and fusion simultaneously, helping isolate whether images are worth adding before committing to multimodal experiments.",
+  "experiment": "imaging/singleprofile/train_on_concat_resnet50",
+  "results_path": "/homes/55/gitanjali/scGeneScope/experiments/search/results/proxy_search_results.csv"
+}

@@ -1,0 +1,17 @@
+{
+  "experiment_id": "llm_metrics_002",
+  "model": "openai_gpt54_mini",
+  "memory_mode": "metrics",
+  "configuration_id": "config_004",
+  "configuration": {
+    "model_setting": "rna_only",
+    "profile_setting": "singleprofile",
+    "rna_encoder": "scvi_n200",
+    "image_encoder": null,
+    "aggregation": null,
+    "fusion": null
+  },
+  "reason": "The only completed result is a single RNA-only singleprofile baseline with PCA RNA features, so the biggest uncertainty is whether the encoder choice matters more than profile/aggregation changes. Testing config_004 keeps the same model and profile setting while switching only the RNA encoder to scVI, which cleanly isolates representation quality and is a strong low-cost next step. It is the best use of budget because it directly compares against the baseline, may improve accuracy without adding confounds, and helps decide whether to invest later in more complex multiprofile or multimodal designs.",
+  "experiment": "rnaseq/singleprofile/train_on_scvi_n200",
+  "results_path": "/homes/55/gitanjali/scGeneScope/experiments/search/results/proxy_search_results.csv"
+}

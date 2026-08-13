@@ -1,0 +1,17 @@
+{
+  "experiment_id": "llm_summary_007",
+  "model": "openai_gpt54_mini",
+  "memory_mode": "summary",
+  "configuration_id": "config_015",
+  "configuration": {
+    "model_setting": "multimodal",
+    "profile_setting": "multiprofile",
+    "rna_encoder": "pca_n2000",
+    "image_encoder": "imagenet_vit_l",
+    "aggregation": "avgpool",
+    "fusion": "concat"
+  },
+  "reason": "Existing evidence strongly favors the RNA-only multiprofile scvi_n200 setup with avgpool (config_005), while the role of multimodal fusion is still completely untested. This experiment keeps the best-performing RNA representation/profile family fixed and adds an image branch with concat fusion, letting us test whether morphology provides complementary signal beyond the strong RNA-only baseline. It is the best next use of budget because it is a logical extension of the current lead, isolates the effect of adding multimodality without changing RNA encoder or profile setting, and directly answers whether the image modality can improve on the strongest known configuration.",
+  "experiment": "multimodal/multiprofile/train_avgpool_on_pca_n2000_with_concat_imagenet_vit_l",
+  "results_path": "/homes/55/gitanjali/scGeneScope/experiments/search/results/proxy_search_results.csv"
+}

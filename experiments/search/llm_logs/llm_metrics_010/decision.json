@@ -1,0 +1,17 @@
+{
+  "experiment_id": "llm_metrics_010",
+  "model": "openai_gpt54_mini",
+  "memory_mode": "metrics",
+  "configuration_id": "config_017",
+  "configuration": {
+    "model_setting": "multimodal",
+    "profile_setting": "multiprofile",
+    "rna_encoder": "scvi_n200",
+    "image_encoder": "imagenet_vit_l",
+    "aggregation": "avgpool",
+    "fusion": "concat"
+  },
+  "reason": "Existing evidence strongly favors the RNA scvi_n200 encoder and multiprofile setting: config_005 is the best result so far (0.667 accuracy, 0.632 F1), outperforming both pca_n2000 and scgpt under the same multiprofile/avgpool setup. The main uncertainty is whether adding image information improves on this strong RNA-only baseline, and whether the benefit holds with multiprofile aggregation. This experiment tests that directly by keeping the best-performing RNA encoder and profile setting while adding a multimodal image branch with concat fusion. It is the best next use of budget because it makes a clean, informative extension of the current top configuration instead of changing multiple factors at once or probing weaker branches likely to underperform.",
+  "experiment": "multimodal/multiprofile/train_avgpool_on_scvi_n200_with_concat_imagenet_vit_l",
+  "results_path": "/homes/55/gitanjali/scGeneScope/experiments/search/results/proxy_search_results.csv"
+}

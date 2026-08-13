@@ -1,0 +1,4 @@
+{
+  "configuration_id": "config_005",
+  "reason": "We have strong evidence that scvi_n200 outperforms pca_n2000 in the singleprofile RNA-only setting, and that moving from singleprofile to multiprofile with transformer aggregation can improve performance. What remains unclear is whether the gain comes from the multiprofile setup itself or from the transformer aggregator. This experiment tests the same scvi_n200 representation in multiprofile form but swaps transformer for the simpler avgpool aggregation, which isolates the effect of aggregation while keeping the promising RNA encoder and profile setting fixed. It is the best next use of budget because it directly clarifies a key design choice with minimal confounding, and it may also reveal whether a simpler, cheaper aggregator is sufficient to capture most of the benefit." 
+}

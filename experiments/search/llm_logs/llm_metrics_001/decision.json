@@ -1,0 +1,17 @@
+{
+  "experiment_id": "llm_metrics_001",
+  "model": "openai_gpt54_mini",
+  "memory_mode": "metrics",
+  "configuration_id": "config_001",
+  "configuration": {
+    "model_setting": "rna_only",
+    "profile_setting": "singleprofile",
+    "rna_encoder": "pca_n2000",
+    "image_encoder": null,
+    "aggregation": null,
+    "fusion": null
+  },
+  "reason": "There is no prior evidence yet, so the most informative first step is a simple baseline that establishes how far RNA-only with a standard representation can go. This will test the basic single-profile, pca_n2000 setup against which later changes in profile handling, encoder choice, aggregation, and multimodal fusion can be compared. Under a limited budget, starting with the simplest configuration is the best use of the next experiment because it anchors the search and helps isolate the value of added complexity in subsequent tests.",
+  "experiment": "rnaseq/singleprofile/train_on_pca_n2000",
+  "results_path": "/homes/55/gitanjali/scGeneScope/experiments/search/results/proxy_search_results.csv"
+}

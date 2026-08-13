@@ -1,0 +1,17 @@
+{
+  "experiment_id": "llm_summary_004",
+  "model": "openai_gpt54_mini",
+  "memory_mode": "summary",
+  "configuration_id": "config_005",
+  "configuration": {
+    "model_setting": "rna_only",
+    "profile_setting": "multiprofile",
+    "rna_encoder": "scvi_n200",
+    "image_encoder": null,
+    "aggregation": "avgpool",
+    "fusion": null
+  },
+  "reason": "We have strong evidence that scvi_n200 outperforms pca_n2000 in the singleprofile RNA-only setting, and that moving from singleprofile to multiprofile with transformer aggregation can improve performance. What remains unclear is whether the gain comes from the multiprofile setup itself or from the transformer aggregator. This experiment tests the same scvi_n200 representation in multiprofile form but swaps transformer for the simpler avgpool aggregation, which isolates the effect of aggregation while keeping the promising RNA encoder and profile setting fixed. It is the best next use of budget because it directly clarifies a key design choice with minimal confounding, and it may also reveal whether a simpler, cheaper aggregator is sufficient to capture most of the benefit.",
+  "experiment": "rnaseq/multiprofile/train_avgpool_on_scvi_n200",
+  "results_path": "/homes/55/gitanjali/scGeneScope/experiments/search/results/proxy_search_results.csv"
+}

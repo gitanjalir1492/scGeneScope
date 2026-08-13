@@ -1,0 +1,17 @@
+{
+  "experiment_id": "llm_metrics_005",
+  "model": "openai_gpt54_mini",
+  "memory_mode": "metrics",
+  "configuration_id": "config_006",
+  "configuration": {
+    "model_setting": "rna_only",
+    "profile_setting": "multiprofile",
+    "rna_encoder": "scvi_n200",
+    "image_encoder": null,
+    "aggregation": "transformer",
+    "fusion": null
+  },
+  "reason": "Evidence so far strongly suggests that multiprofile + avgpool is beneficial: config_005 (scvi_n200, multiprofile, avgpool) is the best result by a clear margin over the singleprofile RNA-only baselines. However, we do not yet know whether that gain comes mainly from the profile setting/aggregation or from the specific RNA encoder. This experiment keeps the promising profile/aggregation choice fixed and swaps only the RNA encoder from scvi_n200 to transformer-based scGPT, directly testing whether a stronger RNA representation can further improve the best-performing design. It is the best next use of budget because it exploits the strongest current direction while isolating one important factor, rather than changing multiple choices at once or moving to less-informed image/multimodal settings.",
+  "experiment": "rnaseq/multiprofile/train_transformerpool_on_scvi_n200",
+  "results_path": "/homes/55/gitanjali/scGeneScope/experiments/search/results/proxy_search_results.csv"
+}

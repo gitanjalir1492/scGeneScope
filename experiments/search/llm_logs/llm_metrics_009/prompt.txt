@@ -1,0 +1,140 @@
+You are acting as an ML research scientist choosing the next experiment
+in a sequential model-search study for multimodal cellular profiling.
+
+The experiment budget is limited. Your objective is therefore not only
+to find a high-performing configuration, but to use each experiment
+efficiently to learn which design decisions matter.
+
+Use the completed experiment history to decide what should be tested
+next.
+
+Decision principles:
+- Validation accuracy is the primary optimization objective.
+- Use validation F1 as supporting evidence, especially when accuracy
+  differences are small.
+- Balance exploration and exploitation.
+- When evidence is weak or sparse, prefer experiments that reduce
+  uncertainty about an important design choice.
+- When previous experiments provide strong evidence for a promising
+  direction, exploit that evidence by testing a logical extension.
+- Prefer comparisons that help isolate the effect of representation,
+  profile setting, aggregation, or fusion when possible.
+- Avoid changing several design choices simultaneously when a simpler
+  experiment could answer the same question.
+- Do not overinterpret a single experiment or small performance
+  difference.
+- Do not assume that multimodal, multiprofile, or more complex models
+  will necessarily outperform simpler models.
+- Consider whether an experiment is informative even if it may not be
+  the configuration with the highest expected immediate performance.
+- Do not repeat a configuration that has already been selected by this
+  search condition.
+- Select only from the available configuration IDs listed below.
+
+For your selection reason, briefly state:
+1. what the existing evidence or uncertainty is,
+2. what this experiment will test or clarify, and
+3. why it is the best use of the next experiment under the limited
+   budget.
+
+Previous completed experiments:
+Configuration: config_001
+Model setting: rna_only
+Profile setting: singleprofile
+RNA encoder: pca_n2000
+Image encoder: None
+Aggregation: None
+Fusion: None
+Validation accuracy: 0.47310519218444824
+Validation F1: 0.44441714882850647
+
+Configuration: config_004
+Model setting: rna_only
+Profile setting: singleprofile
+RNA encoder: scvi_n200
+Image encoder: None
+Aggregation: None
+Fusion: None
+Validation accuracy: 0.5242751240730286
+Validation F1: 0.49714577198028564
+
+Configuration: config_007
+Model setting: rna_only
+Profile setting: singleprofile
+RNA encoder: scgpt
+Image encoder: None
+Aggregation: None
+Fusion: None
+Validation accuracy: 0.38553929328918457
+Validation F1: 0.37460315227508545
+
+Configuration: config_005
+Model setting: rna_only
+Profile setting: multiprofile
+RNA encoder: scvi_n200
+Image encoder: None
+Aggregation: avgpool
+Fusion: None
+Validation accuracy: 0.6670119762420654
+Validation F1: 0.6321578025817871
+
+Configuration: config_006
+Model setting: rna_only
+Profile setting: multiprofile
+RNA encoder: scvi_n200
+Image encoder: None
+Aggregation: transformer
+Fusion: None
+Validation accuracy: 0.6005151271820068
+Validation F1: 0.5771834254264832
+
+Configuration: config_002
+Model setting: rna_only
+Profile setting: multiprofile
+RNA encoder: pca_n2000
+Image encoder: None
+Aggregation: avgpool
+Fusion: None
+Validation accuracy: 0.5882553458213806
+Validation F1: 0.5630835890769958
+
+Configuration: config_009
+Model setting: rna_only
+Profile setting: multiprofile
+RNA encoder: scgpt
+Image encoder: None
+Aggregation: transformer
+Fusion: None
+Validation accuracy: 0.46983104944229126
+Validation F1: 0.45924848318099976
+
+Configuration: config_003
+Model setting: rna_only
+Profile setting: multiprofile
+RNA encoder: pca_n2000
+Image encoder: None
+Aggregation: transformer
+Fusion: None
+Validation accuracy: 0.5164362788200378
+Validation F1: 0.4748119115829468
+
+Available untested configurations:
+config_008: model_setting=rna_only, profile_setting=multiprofile, rna_encoder=scgpt, image_encoder=None, aggregation=avgpool, fusion=None
+config_010: model_setting=image_only, profile_setting=singleprofile, rna_encoder=None, image_encoder=resnet50, aggregation=None, fusion=None
+config_011: model_setting=image_only, profile_setting=singleprofile, rna_encoder=None, image_encoder=imagenet_vit_l, aggregation=None, fusion=None
+config_012: model_setting=image_only, profile_setting=multiprofile, rna_encoder=None, image_encoder=imagenet_vit_l, aggregation=avgpool, fusion=None
+config_013: model_setting=image_only, profile_setting=multiprofile, rna_encoder=None, image_encoder=imagenet_vit_l, aggregation=transformer, fusion=None
+config_014: model_setting=multimodal, profile_setting=singleprofile, rna_encoder=pca_n2000, image_encoder=imagenet_vit_l, aggregation=None, fusion=concat
+config_015: model_setting=multimodal, profile_setting=multiprofile, rna_encoder=pca_n2000, image_encoder=imagenet_vit_l, aggregation=avgpool, fusion=concat
+config_016: model_setting=multimodal, profile_setting=singleprofile, rna_encoder=scvi_n200, image_encoder=imagenet_vit_l, aggregation=None, fusion=concat
+config_017: model_setting=multimodal, profile_setting=multiprofile, rna_encoder=scvi_n200, image_encoder=imagenet_vit_l, aggregation=avgpool, fusion=concat
+config_018: model_setting=multimodal, profile_setting=singleprofile, rna_encoder=scgpt, image_encoder=imagenet_vit_l, aggregation=None, fusion=concat
+config_019: model_setting=multimodal, profile_setting=multiprofile, rna_encoder=scgpt, image_encoder=imagenet_vit_l, aggregation=avgpool, fusion=concat
+
+Choose exactly one configuration.
+
+Return JSON only, using exactly this format:
+{
+  "configuration_id": "config_001",
+  "reason": "Briefly explain the evidence, question being tested, and why this is the best next experiment."
+}

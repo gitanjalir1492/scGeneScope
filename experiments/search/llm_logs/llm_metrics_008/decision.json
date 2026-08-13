@@ -1,0 +1,17 @@
+{
+  "experiment_id": "llm_metrics_008",
+  "model": "openai_gpt54_mini",
+  "memory_mode": "metrics",
+  "configuration_id": "config_003",
+  "configuration": {
+    "model_setting": "rna_only",
+    "profile_setting": "multiprofile",
+    "rna_encoder": "pca_n2000",
+    "image_encoder": null,
+    "aggregation": "transformer",
+    "fusion": null
+  },
+  "reason": "The strongest evidence so far is that RNA-only multiprofile with scvi_n200 and avgpool is best, while transformer aggregation was worse for scvi_n200 and scgpt performed poorly overall. What remains uncertain is whether transformer aggregation is specifically unhelpful only for scvi_n200 or whether the pca_n2000 representation can benefit from it. This experiment isolates the effect of aggregation while holding profile setting and RNA representation fixed, making it the cleanest remaining test of a key design choice under limited budget.",
+  "experiment": "rnaseq/multiprofile/train_transformerpool_on_pca_n2000",
+  "results_path": "/homes/55/gitanjali/scGeneScope/experiments/search/results/proxy_search_results.csv"
+}

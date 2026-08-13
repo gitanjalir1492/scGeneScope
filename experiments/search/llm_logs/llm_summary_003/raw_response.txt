@@ -1,0 +1,4 @@
+{
+  "configuration_id": "config_006",
+  "reason": "The current evidence suggests scvi_n200 is a stronger RNA-only representation than pca_n2000, but we have not yet tested whether profile aggregation matters for this better encoder. This experiment isolates that question by keeping the RNA encoder fixed to scvi_n200 while switching from singleprofile to multiprofile with transformer aggregation, which can capture cross-profile structure more flexibly than avgpool. It is the best next use of the limited budget because it directly tests a promising extension of the best-performing baseline while also clarifying whether added profile complexity provides an actual gain over the simpler singleprofile setup."
+}
