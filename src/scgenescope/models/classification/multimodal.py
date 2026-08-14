@@ -41,6 +41,7 @@ class MultiModalMultipleInputClassifier(LitClassifier):
         compile: bool,
         strict_inputs: bool = True,
         ignore_names: bool = False,
+        fusion: str = "concat",
         **named_encoders: nn.Module,
     ) -> None:
         """Initialize a model instance.
@@ -184,6 +185,20 @@ class MultiModalMultipleInputClassifier(LitClassifier):
         self.hidden_dropout = (
             nn.Dropout(hidden_dropout) if hidden_dropout else nn.Identity()
         )
+
+        if fusion not in {"concat", "weighted"}:
+            raise ValueError(
+                f"Unsupported fusion mode: {fusion}. "
+                "Expected 'concat' or 'weighted'."
+            )
+
+        self.fusion = fusion
+
+        if self.fusion == "weighted":
+            self.fusion_logits = nn.Parameter(
+                torch.zeros(len(self.encoders))
+            )
+
         self.classify = classifier
         self.loss = nn.CrossEntropyLoss(reduction="mean")
         self.strict_inputs = strict_inputs
@@ -210,7 +225,22 @@ class MultiModalMultipleInputClassifier(LitClassifier):
                 xs = [self.normalizers[0](self.encoders[0](self.dropouts[0](xs)))]
 
         xs = [self.hidden_dropout(x) for x in xs]
-        x = torch.cat(xs, dim=1)
+
+        if self.fusion == "concat":
+            x = torch.cat(xs, dim=1)
+        else:
+            reference_shape = xs[0].shape
+            if any(x.shape != reference_shape for x in xs[1:]):
+                raise ValueError(
+                    "Weighted fusion requires all modality embeddings "
+                    "to have the same shape."
+                )
+
+            stacked = torch.stack(xs, dim=0)
+            weights = torch.softmax(self.fusion_logits, dim=0)
+            weight_shape = (len(xs),) + (1,) * (stacked.ndim - 1)
+            x = (stacked * weights.view(weight_shape)).sum(dim=0)
+
         return self.classify(x)
 
     def unpack_batch(self, batch: Any) -> tuple[torch.Tensor, torch.Tensor]:

@@ -1,0 +1,17 @@
+{
+  "experiment_id": "llm_summary_010",
+  "model": "openai_gpt54_mini",
+  "memory_mode": "summary",
+  "configuration_id": "config_017",
+  "configuration": {
+    "model_setting": "multimodal",
+    "profile_setting": "multiprofile",
+    "rna_encoder": "scvi_n200",
+    "image_encoder": "imagenet_vit_l",
+    "aggregation": "avgpool",
+    "fusion": "concat"
+  },
+  "reason": "The strongest evidence so far is that RNA-only multiprofile models outperform singleprofile baselines, and scvi_n200 with avgpool is currently the best-performing setting. What remains uncertain is whether morphology adds complementary signal when the RNA branch is already strong, especially under the same multiprofile/avgpool recipe. This experiment tests that directly by adding an imagenet_vit_l image branch with concat fusion while keeping the successful scvi_n200 + multiprofile + avgpool backbone fixed. It is the best next use of budget because it makes a clean, informative comparison against the best RNA-only result and can reveal whether multimodal fusion provides an incremental gain rather than changing several factors at once.",
+  "experiment": "multimodal/multiprofile/train_avgpool_on_scvi_n200_with_concat_imagenet_vit_l",
+  "results_path": "/homes/55/gitanjali/scGeneScope/experiments/search/results/proxy_search_results.csv"
+}

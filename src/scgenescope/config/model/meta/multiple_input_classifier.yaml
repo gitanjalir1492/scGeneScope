@@ -2,6 +2,10 @@ _target_: scgenescope.models.classification.multimodal.MultiModalMultipleInputCl
 
 classifier: ???
 
+# How modality embeddings are combined before classification.
+# Existing experiments use concatenation by default.
+fusion: concat
+
 optimizer_factory:
   _target_: torch.optim.Adam
   _partial_: true

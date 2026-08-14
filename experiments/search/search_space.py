@@ -235,31 +235,12 @@ def get_missing_implementation(
     fusion = config["fusion"]
 
     if (
-        image_encoder == "resnet50"
-        and (
-            profile_setting == "multiprofile"
-            or model_setting == "multimodal"
-        )
-    ):
-        missing.append(
-            "ResNet50 config for this experiment type"
-        )
-
-    if (
         model_setting == "multimodal"
         and profile_setting == "multiprofile"
         and aggregation == "transformer"
     ):
         missing.append(
             "multimodal Transformer aggregation"
-        )
-
-    if (
-        model_setting == "multimodal"
-        and fusion == "weighted"
-    ):
-        missing.append(
-            "weighted fusion"
         )
 
     return missing

@@ -1,0 +1,17 @@
+{
+  "experiment_id": "llm_summary_008",
+  "model": "openai_gpt54_mini",
+  "memory_mode": "summary",
+  "configuration_id": "config_002",
+  "configuration": {
+    "model_setting": "rna_only",
+    "profile_setting": "multiprofile",
+    "rna_encoder": "pca_n2000",
+    "image_encoder": null,
+    "aggregation": "avgpool",
+    "fusion": null
+  },
+  "reason": "The strongest evidence so far is that RNA-only models with scvi_n200 improve substantially over pca_n2000, and multiprofile with avgpool is especially promising; however, the effect of profile setting and aggregation is still not isolated for pca_n2000. This experiment tests pca_n2000 in the same multiprofile avgpool setup that already worked well with scvi_n200, clarifying whether the gain comes mainly from multiprofile/avgpool or from the RNA representation itself. Under the limited budget, this is a high-value controlled comparison because it changes only the RNA encoder while matching a proven profile/aggregation recipe, making the result easy to interpret and directly informative for the next design choice.",
+  "experiment": "rnaseq/multiprofile/train_avgpool_on_pca_n2000",
+  "results_path": "/homes/55/gitanjali/scGeneScope/experiments/search/results/proxy_search_results.csv"
+}

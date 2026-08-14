@@ -1,0 +1,17 @@
+{
+  "experiment_id": "llm_summary_009",
+  "model": "openai_gpt54_mini",
+  "memory_mode": "summary",
+  "configuration_id": "config_003",
+  "configuration": {
+    "model_setting": "rna_only",
+    "profile_setting": "multiprofile",
+    "rna_encoder": "pca_n2000",
+    "image_encoder": null,
+    "aggregation": "transformer",
+    "fusion": null
+  },
+  "reason": "Current evidence strongly suggests that the RNA branch matters most, and within RNA-only models the multiprofile setting with scvi_n200 plus avgpool is the best performer so far. What remains unclear is whether transformer aggregation can match or exceed avgpool under the same RNA representation, because that comparison has not yet been isolated for pca_n2000. Testing config_003 directly probes the effect of aggregation while holding the rest fixed, making it a high-value, low-confound experiment that improves our understanding of which design choice actually drives performance under the limited budget.",
+  "experiment": "rnaseq/multiprofile/train_transformerpool_on_pca_n2000",
+  "results_path": "/homes/55/gitanjali/scGeneScope/experiments/search/results/proxy_search_results.csv"
+}

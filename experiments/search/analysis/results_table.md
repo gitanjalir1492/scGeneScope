@@ -4,14 +4,16 @@
 
 All search methods use the same 19 runnable configurations and a budget of 10 experiments.
 
-| Method | Trials | Best Proxy Val Acc | Best Proxy Val F1 | Trial Best Found | Best Configuration | Total Proxy Runtime |
-| --- | ---: | ---: | ---: | ---: | --- | ---: |
-| Random | 10 | 0.7062 | 0.6720 | 10 | Multimodal, scVI n200 + ImageNet ViT-L, multiprofile, avgpool, concat | 3.10 h |
-| Bayesian | In progress | TBD | TBD | TBD | TBD | TBD |
-| LLM Metrics | Not started | TBD | TBD | TBD | TBD | TBD |
-| LLM Summary | Not started | TBD | TBD | TBD | TBD | TBD |
+| Method | Trials | Best Proxy Val Acc | Best Proxy Val F1 | Best Experiment | Total Proxy Runtime |
+| --- | ---: | ---: | ---: | --- | ---: |
+| Random | 10 | 0.7062 | 0.6720 | random_010 | 3.10 h |
+| Bayesian | 10 | 0.7159 | 0.6766 | bayes_010 | 3.07 h |
+| LLM Metrics | 10 | 0.7038 | 0.6656 | llm_metrics_010 | 1.98 h |
+| LLM Summary | 10 | 0.7148 | 0.6704 | llm_summary_010 | 2.77 h |
 
-The main search comparison is based on best validation accuracy found as a function of experiment number. Runtime is also tracked to compare performance against total proxy training time.
+Bayesian search achieved the highest validation accuracy in the 10-trial pilot at 0.7159. LLM Summary reached a similar best validation accuracy of 0.7148, while LLM Metrics reached 0.7038 and Random reached 0.7062.
+
+The main search comparison is based on best validation accuracy found as a function of experiment number. Runtime is also tracked to compare performance against cumulative proxy training time.
 
 ## Proxy Calibration
 
@@ -33,18 +35,18 @@ The strongest configurations selected during proxy search will be retrained usin
 
 | Search Method | Selected Configuration | Proxy Val Acc | Full Val Acc | Full Val F1 | Test Acc | Test F1 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Random | TBD | TBD | TBD | TBD | TBD | TBD |
-| Bayesian | TBD | TBD | TBD | TBD | TBD | TBD |
-| LLM Metrics | TBD | TBD | TBD | TBD | TBD | TBD |
-| LLM Summary | TBD | TBD | TBD | TBD | TBD | TBD |
+| Random | TBD | 0.7062 | TBD | TBD | TBD | TBD |
+| Bayesian | TBD | 0.7159 | TBD | TBD | TBD | TBD |
+| LLM Metrics | TBD | 0.7038 | TBD | TBD | TBD | TBD |
+| LLM Summary | TBD | 0.7148 | TBD | TBD | TBD | TBD |
 
 The held-out test set will only be used after the search stage is complete.
 
 ## Main Figures
 
-The current analysis script generates:
+The analysis script generates:
 
 - `best_validation_vs_trial.png` - best validation accuracy found versus experiment number
 - `best_validation_vs_runtime.png` - best validation accuracy found versus cumulative proxy runtime
 
-These figures will update as the Bayesian and LLM search runs finish.
+The current figures contain the completed 10-trial Random, Bayesian, LLM Metrics, and LLM Summary pilot searches.

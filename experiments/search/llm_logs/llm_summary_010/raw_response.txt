@@ -1,0 +1,4 @@
+{
+  "configuration_id": "config_017",
+  "reason": "The strongest evidence so far is that RNA-only multiprofile models outperform singleprofile baselines, and scvi_n200 with avgpool is currently the best-performing setting. What remains uncertain is whether morphology adds complementary signal when the RNA branch is already strong, especially under the same multiprofile/avgpool recipe. This experiment tests that directly by adding an imagenet_vit_l image branch with concat fusion while keeping the successful scvi_n200 + multiprofile + avgpool backbone fixed. It is the best next use of budget because it makes a clean, informative comparison against the best RNA-only result and can reveal whether multimodal fusion provides an incremental gain rather than changing several factors at once."
+}
