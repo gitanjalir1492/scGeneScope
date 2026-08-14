@@ -234,15 +234,6 @@ def get_missing_implementation(
     aggregation = config["aggregation"]
     fusion = config["fusion"]
 
-    if (
-        model_setting == "multimodal"
-        and profile_setting == "multiprofile"
-        and aggregation == "transformer"
-    ):
-        missing.append(
-            "multimodal Transformer aggregation"
-        )
-
     return missing
 
 
