@@ -35,7 +35,7 @@ seed: 12345
 # Configurable experiment parameters
 NUM_RNASEQ_SAMPLES: 32 # number of samples to use for training and validation
 NUM_IMAGING_SAMPLES: 32
-BATCH_SIZE: 4096
+BATCH_SIZE: 1024
 NUM_WORKERS: 2
 RNASEQ_INPUT_DIM: 2000
 IMAGING_INPUT_DIM: 10240
@@ -290,6 +290,7 @@ model:
 
 
 trainer:
+  accumulate_grad_batches: 4
   min_epochs: 2
   max_epochs: 100
   gradient_clip_val: 0.5
