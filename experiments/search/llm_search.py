@@ -112,6 +112,9 @@ def method_name(
     if memory_mode == "metrics":
         return "llm_metrics"
 
+    if memory_mode == "cost":
+        return "llm_cost"
+
     return "llm_summary"
 
 
@@ -168,7 +171,7 @@ def format_history(
         f"{row.get('val_f1') or 'not available'}"
     )
 
-    if memory_mode == "summary":
+    if memory_mode in {"summary", "cost"}:
         text += (
             "\nExperiment summary: "
             f"{row.get('experiment_summary') or 'not available'}"
@@ -244,6 +247,45 @@ def build_prompt(
         for config_id in available_ids
     )
 
+    cost_instructions = ""
+
+    if memory_mode == "cost":
+        cost_instructions = """
+Additional cost-aware decision principles:
+- Before choosing an experiment, estimate its relative computational
+  cost from the candidate architecture itself.
+- Do not assume access to measured runtime for an untested
+  configuration.
+- Reason about cost using architectural characteristics such as
+  representation dimensionality, single- versus multiprofile
+  processing, aggregation complexity, multimodal processing, and
+  fusion.
+- Classify the selected experiment's predicted cost as low, medium,
+  or high.
+- Balance expected scientific value against expected computational
+  expense.
+- Do not automatically prefer inexpensive experiments. A costly
+  experiment is appropriate when its expected information or
+  performance value justifies its expense.
+"""
+
+    if memory_mode == "cost":
+        response_format = """
+{{
+  "configuration_id": "config_001",
+  "predicted_cost": "low",
+  "cost_reason": "Briefly explain which architectural features drive the expected computational cost.",
+  "reason": "Briefly explain the evidence, question being tested, and why its expected scientific value justifies this use of compute."
+}}
+"""
+    else:
+        response_format = """
+{{
+  "configuration_id": "config_001",
+  "reason": "Briefly explain the evidence, question being tested, and why this is the best next experiment."
+}}
+"""
+
     prompt = f"""
 You are acting as an ML research scientist choosing the next experiment
 in a sequential model-search study for multimodal cellular profiling.
@@ -278,6 +320,8 @@ Decision principles:
   search condition.
 - Select only from the available configuration IDs listed below.
 
+{cost_instructions}
+
 For your selection reason, briefly state:
 1. what the existing evidence or uncertainty is,
 2. what this experiment will test or clarify, and
@@ -293,10 +337,7 @@ Available untested configurations:
 Choose exactly one configuration.
 
 Return JSON only, using exactly this format:
-{{
-  "configuration_id": "config_001",
-  "reason": "Briefly explain the evidence, question being tested, and why this is the best next experiment."
-}}
+{response_format}
 """.strip()
 
     return prompt, config_by_id, available_ids
@@ -355,13 +396,12 @@ def clean_json_text(
 
 def parse_response(
     text: str,
-) -> tuple[str, str]:
+    memory_mode: str,
+) -> tuple[str, str, str, str]:
     cleaned_text = clean_json_text(text)
 
     try:
-        response = json.loads(
-            cleaned_text
-        )
+        response = json.loads(cleaned_text)
     except json.JSONDecodeError as error:
         raise ValueError(
             "Response is not valid JSON."
@@ -372,30 +412,45 @@ def parse_response(
             "Response must be a JSON object."
         )
 
-    config_id = response.get(
-        "configuration_id"
-    )
-    reason = response.get(
-        "reason",
-        "",
-    )
+    config_id = response.get("configuration_id")
+    reason = response.get("reason", "")
+    predicted_cost = response.get("predicted_cost", "")
+    cost_reason = response.get("cost_reason", "")
 
     if not isinstance(config_id, str):
         raise ValueError(
             "Missing configuration_id."
         )
 
-    if not isinstance(reason, str):
+    if not isinstance(reason, str) or not reason.strip():
         raise ValueError(
-            "Reason must be a string."
+            "Reason must be a non-empty string."
         )
 
-    if not reason.strip():
-        raise ValueError(
-            "Reason must not be empty."
-        )
+    if memory_mode == "cost":
+        if predicted_cost not in {
+            "low",
+            "medium",
+            "high",
+        }:
+            raise ValueError(
+                "predicted_cost must be low, medium, or high."
+            )
 
-    return config_id, reason.strip()
+        if (
+            not isinstance(cost_reason, str)
+            or not cost_reason.strip()
+        ):
+            raise ValueError(
+                "cost_reason must be a non-empty string."
+            )
+
+    return (
+        config_id,
+        reason.strip(),
+        predicted_cost,
+        cost_reason.strip(),
+    )
 
 
 def next_number(
@@ -404,6 +459,8 @@ def next_number(
 ) -> int:
     if search_method == "llm_metrics":
         prefix = "llm_metrics_"
+    elif search_method == "llm_cost":
+        prefix = "llm_cost_"
     else:
         prefix = "llm_summary_"
 
@@ -438,6 +495,8 @@ def make_row(
 ) -> dict[str, str]:
     if search_method == "llm_metrics":
         prefix = "llm_metrics"
+    elif search_method == "llm_cost":
+        prefix = "llm_cost"
     else:
         prefix = "llm_summary"
 
@@ -491,6 +550,8 @@ def save_decision_artifacts(
     config: dict,
     reason: str,
     experiment: str,
+    predicted_cost: str = "",
+    cost_reason: str = "",
 ) -> None:
     """Save the exact LLM decision context for reproducibility."""
 
@@ -520,6 +581,8 @@ def save_decision_artifacts(
         "configuration_id": config_id,
         "configuration": config,
         "reason": reason,
+        "predicted_cost": predicted_cost,
+        "cost_reason": cost_reason,
         "experiment": experiment,
         "results_path": str(RESULTS_PATH),
     }
@@ -548,6 +611,7 @@ def main() -> None:
         choices=[
             "metrics",
             "summary",
+            "cost",
         ],
         default="metrics",
     )
@@ -643,8 +707,14 @@ def main() -> None:
         )
         return
 
-    config_id, reason = parse_response(
-        response_text
+    (
+        config_id,
+        reason,
+        predicted_cost,
+        cost_reason,
+    ) = parse_response(
+        response_text,
+        args.memory_mode,
     )
 
     if config_id not in config_by_id:
@@ -683,6 +753,8 @@ def main() -> None:
         config=config,
         reason=reason,
         experiment=row["experiment"],
+        predicted_cost=predicted_cost,
+        cost_reason=cost_reason,
     )
 
     rows.append(row)
