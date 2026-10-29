@@ -1,6 +1,7 @@
 import argparse
 import csv
 import json
+import random
 from pathlib import Path
 import os
 
@@ -118,10 +119,16 @@ def method_name(
     return "llm_summary"
 
 
-def build_lookup() -> tuple[dict, dict]:
+def build_lookup(
+    shuffle_seed: int | None = None,
+) -> tuple[dict, dict]:
     configs = generate_all_configurations(
         runnable_only=True
     )
+
+    if shuffle_seed is not None:
+        # IDs follow the shuffled order, so neither list position nor ID reveals the model setting
+        random.Random(shuffle_seed).shuffle(configs)
 
     config_by_id = {}
     id_by_key = {}
@@ -183,9 +190,13 @@ def format_history(
 def build_prompt(
     rows: list[dict[str, str]],
     memory_mode: str,
+    shuffle_seed: int | None = None,
+    budget: int | None = None,
+    isolation_principles: bool = True,
 ) -> tuple[str, dict, list[str]]:
+    """Defaults give the original prompt; shuffle_seed, budget and isolation_principles=False are ablation variants."""
     search_method = method_name(memory_mode)
-    config_by_id, id_by_key = build_lookup()
+    config_by_id, id_by_key = build_lookup(shuffle_seed)
 
     method_rows = [
         row
@@ -286,13 +297,46 @@ Additional cost-aware decision principles:
 }}
 """
 
+    if budget is None:
+        objective_text = """
+The experiment budget is limited. Your objective is therefore not only
+to find a high-performing configuration, but to use each experiment
+efficiently to learn which design decisions matter.
+""".strip()
+        informative_principle = """
+- Consider whether an experiment is informative even if it may not be
+  the configuration with the highest expected immediate performance."""
+    else:
+        experiment_number = len(completed_rows) + 1
+        objective_text = (
+            f"The experiment budget is {budget} experiments. This is experiment "
+            f"{experiment_number} of {budget}, so {budget - experiment_number} "
+            "experiment(s) will remain after this one.\n"
+            "Your objective is to find the configuration with the highest "
+            "validation accuracy by the end of the budget.\n"
+            "Only the best validation accuracy found within the budget counts."
+        )
+        informative_principle = ""
+
+    isolation_text = ""
+    if isolation_principles:
+        isolation_text = """
+- Prefer comparisons that help isolate the effect of representation,
+  profile setting, aggregation, or fusion when possible.
+- Avoid changing several design choices simultaneously when a simpler
+  experiment could answer the same question."""
+
+    complexity_text = ""
+    if isolation_principles:
+        complexity_text = """
+- Do not assume that multimodal, multiprofile, or more complex models
+  will necessarily outperform simpler models."""
+
     prompt = f"""
 You are acting as an ML research scientist choosing the next experiment
 in a sequential model-search study for multimodal cellular profiling.
 
-The experiment budget is limited. Your objective is therefore not only
-to find a high-performing configuration, but to use each experiment
-efficiently to learn which design decisions matter.
+{objective_text}
 
 Use the completed experiment history to decide what should be tested
 next.
@@ -305,17 +349,9 @@ Decision principles:
 - When evidence is weak or sparse, prefer experiments that reduce
   uncertainty about an important design choice.
 - When previous experiments provide strong evidence for a promising
-  direction, exploit that evidence by testing a logical extension.
-- Prefer comparisons that help isolate the effect of representation,
-  profile setting, aggregation, or fusion when possible.
-- Avoid changing several design choices simultaneously when a simpler
-  experiment could answer the same question.
+  direction, exploit that evidence by testing a logical extension.{isolation_text}
 - Do not overinterpret a single experiment or small performance
-  difference.
-- Do not assume that multimodal, multiprofile, or more complex models
-  will necessarily outperform simpler models.
-- Consider whether an experiment is informative even if it may not be
-  the configuration with the highest expected immediate performance.
+  difference.{complexity_text}{informative_principle}
 - Do not repeat a configuration that has already been selected by this
   search condition.
 - Select only from the available configuration IDs listed below.

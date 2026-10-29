@@ -26,8 +26,18 @@ RESULTS_PATH = Path(
         SEARCH_DIRECTORY / "results" / "master_results.csv",
     )
 ).resolve()
-LOG_DIRECTORY = SEARCH_DIRECTORY / "logs"
-RUN_DIRECTORY = SEARCH_DIRECTORY / "runs"
+LOG_DIRECTORY = Path(
+    os.environ.get(
+        "SCGENESCOPE_LOG_DIR",
+        SEARCH_DIRECTORY / "logs",
+    )
+).resolve()
+RUN_DIRECTORY = Path(
+    os.environ.get(
+        "SCGENESCOPE_RUN_DIR",
+        SEARCH_DIRECTORY / "runs",
+    )
+).resolve()
 
 FIELDNAMES = [
     "experiment_id",
@@ -90,6 +100,7 @@ def build_command(
     python_executable: str,
     run_directory: Path,
     proxy: bool = False,
+    seed: int | None = None,
 ) -> list[str]:
     command = [
         python_executable,
@@ -98,6 +109,15 @@ def build_command(
         f"hydra.run.dir={run_directory}",
         "test=false",
     ]
+
+    if seed is not None:
+        # "warn" keeps ops without a deterministic CUDA kernel from crashing the run.
+        command.extend(
+            [
+                f"seed={seed}",
+                "trainer.deterministic=warn",
+            ]
+        )
 
     if proxy:
         command.extend(
@@ -247,6 +267,7 @@ def run_experiment(
     rows: list[dict[str, str]],
     python_executable: str,
     proxy: bool = False,
+    seed: int | None = None,
 ) -> None:
     LOG_DIRECTORY.mkdir(
         parents=True,
@@ -279,6 +300,7 @@ def run_experiment(
         python_executable=python_executable,
         run_directory=run_directory,
         proxy=proxy,
+        seed=seed,
     )
 
     print("\nSelected experiment:")
@@ -397,6 +419,7 @@ def preview_experiment(
     row: dict[str, str],
     python_executable: str,
     proxy: bool = False,
+    seed: int | None = None,
 ) -> None:
     preview_directory = (
         RUN_DIRECTORY
@@ -408,6 +431,7 @@ def preview_experiment(
         python_executable=python_executable,
         run_directory=preview_directory,
         proxy=proxy,
+        seed=seed,
     )
 
     print("\nSelected experiment:")
@@ -480,6 +504,16 @@ def main() -> None:
         ),
     )
 
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help=(
+            "Seed for reproducible training; also "
+            "enables deterministic algorithms."
+        ),
+    )
+
     args = parser.parse_args()
 
     rows = read_results()
@@ -501,12 +535,14 @@ def main() -> None:
             rows=rows,
             python_executable=args.python,
             proxy=args.proxy,
+            seed=args.seed,
         )
     else:
         preview_experiment(
             row=row,
             python_executable=args.python,
             proxy=args.proxy,
+            seed=args.seed,
         )
 
 

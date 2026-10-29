@@ -6,6 +6,7 @@ import os
 
 from search_space import (
     AGGREGATIONS,
+    FUSIONS,
     IMAGE_ENCODERS,
     MODEL_SETTINGS,
     PROFILE_SETTINGS,
@@ -195,13 +196,7 @@ def next_experiment_number(
 def suggest_parameters(
     trial,
 ) -> dict[str, Any]:
-    """
-    Ask Optuna for one runnable configuration.
-
-    Conditional branches expose only parameters that genuinely vary
-    within the currently runnable search space. Fixed implementation
-    choices are filled in directly rather than sampled.
-    """
+    """Ask Optuna for one configuration from the conditional search space."""
 
     model_setting = trial.suggest_categorical(
         "model_setting",
@@ -239,21 +234,14 @@ def suggest_parameters(
             )
 
     elif model_setting == "image_only":
-        if profile_setting == "singleprofile":
-            config["image_encoder"] = (
-                trial.suggest_categorical(
-                    "image_encoder",
-                    IMAGE_ENCODERS,
-                )
+        config["image_encoder"] = (
+            trial.suggest_categorical(
+                "image_encoder",
+                IMAGE_ENCODERS,
             )
+        )
 
-        else:
-            # ResNet50 multiprofile configs are not currently
-            # implemented, so ViT-L is the only runnable encoder.
-            config["image_encoder"] = (
-                "imagenet_vit_l"
-            )
-
+        if profile_setting == "multiprofile":
             config["aggregation"] = (
                 trial.suggest_categorical(
                     "aggregation",
@@ -268,18 +256,26 @@ def suggest_parameters(
                 RNA_ENCODERS,
             )
         )
-
-        # These are currently the only implemented multimodal
-        # representation and fusion choices.
         config["image_encoder"] = (
-            "imagenet_vit_l"
+            trial.suggest_categorical(
+                "image_encoder",
+                IMAGE_ENCODERS,
+            )
         )
-        config["fusion"] = "concat"
+        config["fusion"] = (
+            trial.suggest_categorical(
+                "fusion",
+                FUSIONS,
+            )
+        )
 
         if profile_setting == "multiprofile":
-            # Multimodal Transformer aggregation is not yet
-            # implemented, so avgpool is currently fixed.
-            config["aggregation"] = "avgpool"
+            config["aggregation"] = (
+                trial.suggest_categorical(
+                    "aggregation",
+                    AGGREGATIONS,
+                )
+            )
 
     validate_configuration(config)
 
@@ -304,102 +300,33 @@ def suggest_parameters(
 def trial_data_for_configuration(
     config: dict[str, Any],
 ):
-    """
-    Reconstruct the Optuna parameterization used for a completed
-    runnable configuration.
-
-    Only parameters that vary within that conditional branch are
-    included. Fixed implementation choices are deliberately omitted.
-    """
+    """Reconstruct the Optuna parameterization that suggest_parameters uses for a configuration."""
 
     from optuna.distributions import (
         CategoricalDistribution,
     )
 
+    choices = {
+        "model_setting": MODEL_SETTINGS,
+        "profile_setting": PROFILE_SETTINGS,
+        "rna_encoder": RNA_ENCODERS,
+        "image_encoder": IMAGE_ENCODERS,
+        "aggregation": AGGREGATIONS,
+        "fusion": FUSIONS,
+    }
+
     params = {
-        "model_setting": (
-            config["model_setting"]
-        ),
-        "profile_setting": (
-            config["profile_setting"]
-        ),
+        name: config[name]
+        for name in choices
+        if config[name] is not None
     }
 
     distributions = {
-        "model_setting": (
-            CategoricalDistribution(
-                choices=MODEL_SETTINGS
-            )
-        ),
-        "profile_setting": (
-            CategoricalDistribution(
-                choices=PROFILE_SETTINGS
-            )
-        ),
+        name: CategoricalDistribution(
+            choices=choices[name]
+        )
+        for name in params
     }
-
-    model_setting = config[
-        "model_setting"
-    ]
-    profile_setting = config[
-        "profile_setting"
-    ]
-
-    if model_setting == "rna_only":
-        params["rna_encoder"] = (
-            config["rna_encoder"]
-        )
-
-        distributions["rna_encoder"] = (
-            CategoricalDistribution(
-                choices=RNA_ENCODERS
-            )
-        )
-
-        if profile_setting == "multiprofile":
-            params["aggregation"] = (
-                config["aggregation"]
-            )
-
-            distributions["aggregation"] = (
-                CategoricalDistribution(
-                    choices=AGGREGATIONS
-                )
-            )
-
-    elif model_setting == "image_only":
-        if profile_setting == "singleprofile":
-            params["image_encoder"] = (
-                config["image_encoder"]
-            )
-
-            distributions["image_encoder"] = (
-                CategoricalDistribution(
-                    choices=IMAGE_ENCODERS
-                )
-            )
-
-        else:
-            params["aggregation"] = (
-                config["aggregation"]
-            )
-
-            distributions["aggregation"] = (
-                CategoricalDistribution(
-                    choices=AGGREGATIONS
-                )
-            )
-
-    elif model_setting == "multimodal":
-        params["rna_encoder"] = (
-            config["rna_encoder"]
-        )
-
-        distributions["rna_encoder"] = (
-            CategoricalDistribution(
-                choices=RNA_ENCODERS
-            )
-        )
 
     return params, distributions
 
@@ -623,8 +550,7 @@ def make_result_row(
         "selection_reason": (
             "Optuna TPE suggestion based on "
             f"{completed_count} completed Bayesian "
-            "trial(s), restricted to the currently "
-            "runnable search space."
+            "trial(s)."
         ),
         "experiment_summary": "",
         "started_at": "",
