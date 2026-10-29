@@ -36,19 +36,22 @@ LANDSCAPES = {
 REPLAY_DIR = SEARCH_DIR / "results" / "lookup_replays"
 OUTPUT_DIR = SEARCH_DIR / "analysis" / "lookup_replay"
 # Prompt variants: shuffle = random candidate order and IDs per replicate; budget = state experiment k of N and
-# make best-found accuracy the only objective; isolation = keep the one-factor-at-a-time / complexity principles
+# make best-found accuracy the only objective; isolation = keep the one-factor-at-a-time / complexity principles;
+# gpu = show measured GPU hours of completed runs and ask to keep total GPU hours low
 LLM_VARIANTS = {
-    "llm_metrics": dict(mode="metrics", shuffle=False, budget=False, isolation=True),
-    "llm_summary": dict(mode="summary", shuffle=False, budget=False, isolation=True),
-    "llm_metrics_shuffled": dict(mode="metrics", shuffle=True, budget=False, isolation=True),
-    "llm_metrics_budget": dict(mode="metrics", shuffle=False, budget=True, isolation=True),
-    "llm_metrics_no_isolation": dict(mode="metrics", shuffle=False, budget=False, isolation=False),
-    "llm_metrics_combined": dict(mode="metrics", shuffle=True, budget=True, isolation=False),
+    "llm_metrics": dict(mode="metrics", shuffle=False, budget=False, isolation=True, gpu=False),
+    "llm_summary": dict(mode="summary", shuffle=False, budget=False, isolation=True, gpu=False),
+    "llm_metrics_shuffled": dict(mode="metrics", shuffle=True, budget=False, isolation=True, gpu=False),
+    "llm_metrics_budget": dict(mode="metrics", shuffle=False, budget=True, isolation=True, gpu=False),
+    "llm_metrics_no_isolation": dict(mode="metrics", shuffle=False, budget=False, isolation=False, gpu=False),
+    "llm_metrics_combined": dict(mode="metrics", shuffle=True, budget=True, isolation=False, gpu=False),
+    "llm_metrics_combined_gpu": dict(mode="metrics", shuffle=True, budget=True, isolation=False, gpu=True),
 }
 METHOD_ORDER = ["random", "bayesian", *LLM_VARIANTS]
 COLOURS = {"random": "#7f7f7f", "bayesian": "#1f77b4", "llm_metrics": "#d62728", "llm_summary": "#2ca02c",
            "llm_metrics_shuffled": "#ff7f0e", "llm_metrics_budget": "#9467bd",
-           "llm_metrics_no_isolation": "#8c564b", "llm_metrics_combined": "#e377c2"}
+           "llm_metrics_no_isolation": "#8c564b", "llm_metrics_combined": "#e377c2",
+           "llm_metrics_combined_gpu": "#17becf"}
 MAX_LLM_ATTEMPTS = 3
 N_BOOTSTRAP = 2000
 
@@ -79,7 +82,8 @@ def base_row(config: dict, method: str, number: int, reason: str) -> dict[str, s
 
 def complete(row: dict[str, str], landscape: dict[str, dict]) -> None:
     result = landscape[row["experiment"]]
-    row.update(status="completed", val_accuracy=f"{result['val_accuracy']:.6f}", val_f1=f"{result['val_f1']:.6f}")
+    row.update(status="completed", val_accuracy=f"{result['val_accuracy']:.6f}", val_f1=f"{result['val_f1']:.6f}",
+               runtime_hours=f"{result['runtime_hours']:.4f}")
 
 
 def propose_random(rows, method, seed, budget, **_):
@@ -99,7 +103,7 @@ def propose_llm(rows, method, log, seed, budget, **_):
     mode = variant["mode"]
     prompt, config_by_id, available_ids = llm_search.build_prompt(
         rows, mode, shuffle_seed=seed if variant["shuffle"] else None, budget=budget if variant["budget"] else None,
-        isolation_principles=variant["isolation"])
+        isolation_principles=variant["isolation"], gpu_hours_aware=variant["gpu"])
     for attempt in range(1, MAX_LLM_ATTEMPTS + 1):
         text = llm_search.query_llm(prompt)
         log.append({"type": "decision", "trial": len(rows) + 1, "attempt": attempt, "prompt": prompt,

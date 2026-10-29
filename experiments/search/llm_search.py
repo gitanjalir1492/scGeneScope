@@ -163,6 +163,7 @@ def format_history(
     row: dict[str, str],
     config_id: str,
     memory_mode: str,
+    show_gpu_hours: bool = False,
 ) -> str:
     text = (
         f"Configuration: {config_id}\n"
@@ -177,6 +178,12 @@ def format_history(
         f"Validation F1: "
         f"{row.get('val_f1') or 'not available'}"
     )
+
+    if show_gpu_hours:
+        text += (
+            "\nTraining cost: "
+            f"{float(row['runtime_hours']):.2f} GPU hours"
+        )
 
     if memory_mode in {"summary", "cost"}:
         text += (
@@ -193,8 +200,9 @@ def build_prompt(
     shuffle_seed: int | None = None,
     budget: int | None = None,
     isolation_principles: bool = True,
+    gpu_hours_aware: bool = False,
 ) -> tuple[str, dict, list[str]]:
-    """Defaults give the original prompt; shuffle_seed, budget and isolation_principles=False are ablation variants."""
+    """Defaults give the original prompt; shuffle_seed, budget, isolation_principles=False and gpu_hours_aware are ablation variants."""
     search_method = method_name(memory_mode)
     config_by_id, id_by_key = build_lookup(shuffle_seed)
 
@@ -240,11 +248,15 @@ def build_prompt(
                     row,
                     config_id,
                     memory_mode,
+                    show_gpu_hours=gpu_hours_aware,
                 )
             )
 
     if history:
         history_text = "\n\n".join(history)
+        if gpu_hours_aware:
+            used_hours = sum(float(row["runtime_hours"]) for row in completed_rows)
+            history_text = f"GPU hours used so far: {used_hours:.2f}\n\n{history_text}"
     else:
         history_text = (
             "No experiments have been completed yet."
@@ -278,6 +290,23 @@ Additional cost-aware decision principles:
 - Do not automatically prefer inexpensive experiments. A costly
   experiment is appropriate when its expected information or
   performance value justifies its expense.
+"""
+
+    if gpu_hours_aware:
+        cost_instructions = """
+Compute-cost principles:
+- Training time is also a cost. Completed experiments show their
+  measured training cost in GPU hours; untested configurations have no
+  measured cost, so estimate it from the architecture (multiprofile
+  aggregation, multimodal processing and larger representations take
+  longer to train).
+- Aim to reach the best validation accuracy while keeping the total GPU
+  hours low. Prefer a cheaper configuration when its expected accuracy
+  is similar to a more expensive one.
+- Do not avoid an expensive configuration when it is likely to be the
+  best-performing one.
+- In your selection reason, also state the expected relative cost of
+  the chosen experiment.
 """
 
     if memory_mode == "cost":
