@@ -165,6 +165,8 @@ To test these, I replay the LLM Metrics condition with prompt variants that each
 
 Each variant uses the same model, 5 replicates and a budget of 10, and is scored on the full-training landscape. Besides best-found accuracy, I record the share of selections per model setting, how many distinct first picks were made, the mean experiment number of the first multimodal selection, and the number of replicates that never selected a multimodal configuration.
 
+Results are reported in the README (Lookup Replays and LLM Prompt Ablation sections).
+
 ## Final Evaluation
 
 Proxy performance is not treated as final model performance.

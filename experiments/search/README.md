@@ -234,28 +234,62 @@ Each replicate starts with no history, uses its own seed, has a budget of 10 exp
 
 ```bash
 python replay_search.py --methods random bayesian --replicates 200
-python replay_search.py --methods llm_metrics llm_summary --replicates 5   # needs OpenAI credentials
+python replay_search.py --methods llm_metrics llm_summary --replicates 5   # needs LLM credentials, see below
+python replay_search.py --methods llm_metrics_shuffled llm_metrics_budget llm_metrics_no_isolation llm_metrics_combined --replicates 5
 python replay_search.py --analyze-only
 ```
 
-Results with 200 replicates per method (mean best validation accuracy found, 95% bootstrap CI):
+The LLM calls go through the Novo GenAI marketplace gateway:
 
-| Method | After 3 | After 5 | After 10 | Found optimum by 10 | Found a top-3 config by 10 |
-| --- | --- | --- | --- | --- | --- |
-| Random | 0.629 (0.618-0.640) | 0.663 (0.655-0.672) | 0.703 (0.699-0.707) | 24.5% | 52.0% |
-| Bayesian (TPE) | 0.590 (0.580-0.601) | 0.650 (0.641-0.658) | 0.695 (0.691-0.700) | 15.0% | 42.0% |
+```bash
+export OPENAI_API_KEY=$(tr -d '[:space:]' < ~/openai_api_key.txt)
+export OPENAI_BASE_URL=https://api.marketplace.novo-genai.com/v1
+```
+
+Mean best validation accuracy found (full training), with 95% bootstrap CI across replicates:
+
+| Method | Replicates | After 3 | After 5 | After 10 | Found optimum by 10 | Found a top-3 config by 10 | Mean GPU hours for 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Random | 200 | 0.629 (0.618-0.640) | 0.663 (0.655-0.672) | 0.703 (0.699-0.707) | 24.5% | 52.0% | 40.5 |
+| Bayesian (TPE) | 200 | 0.590 (0.580-0.601) | 0.650 (0.641-0.658) | 0.695 (0.691-0.700) | 15.0% | 42.0% | 32.4 |
+| LLM Metrics | 5 | 0.520 (0.520-0.520) | 0.652 (0.651-0.653) | 0.653 (0.653-0.653) | 0% | 0% | 8.4 |
+| LLM Summary | 5 | 0.560 (0.520-0.612) | 0.653 (0.653-0.653) | 0.658 (0.653-0.668) | 0% | 0% | 15.4 |
 
 With 10 experiments, TPE does slightly worse than random. Its conditional parameterization picks the model setting first, so multimodal configurations (36 of 51, and all of the top ones) are chosen about 50% of the time instead of 71% under uniform random selection, and 10 trials are too few for TPE to correct this.
 
-The LLM conditions have not been replayed yet; they need OpenAI API access.
+Both LLM conditions do worse than random. They spent 76-84% of their experiments on RNA-only models, and every LLM Metrics replicate started with the same configuration (`config_001`, RNA-only single-profile PCA) and plateaued at 0.653, the best RNA-only model. Their selection reasons describe a one-factor-at-a-time ablation from the simplest baseline rather than a search for the best model. The replicates are nearly deterministic, so the narrow CIs reflect how similar the trajectories are, not a precise estimate.
+
+## LLM Prompt Ablation
+
+To find out why the LLMs stay on RNA-only models, I replayed LLM Metrics with prompt variants that change one thing each (see METHODS.md for the exact changes). The default prompt is unchanged.
+
+| Variant | Change | After 3 | After 5 | After 10 | Found optimum by 10 | Found a top-3 config by 10 | Multimodal share of picks | Mean GPU hours for 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| LLM Metrics | none (original prompt) | 0.520 | 0.652 | 0.653 (0.653-0.653) | 0% | 0% | 2% | 8.4 |
+| Shuffled | random candidate order and IDs | 0.631 | 0.649 | 0.670 (0.612-0.725) | 60% | 60% | 68% | 33.5 |
+| Budget | states "experiment k of 10"; best-found accuracy is the only goal | 0.572 | 0.652 | 0.706 (0.689-0.723) | 40% | 40% | 14% | 10.7 |
+| No isolation | removes one-factor-at-a-time and "complex is not better" principles | 0.611 | 0.642 | 0.677 (0.653-0.702) | 0% | 20% | 38% | 37.1 |
+| Combined | all three changes | 0.666 | 0.679 | 0.723 (0.719-0.725) | 80% | 100% | 100% | 58.4 |
+| Random (reference) | | 0.629 | 0.663 | 0.703 (0.699-0.707) | 24.5% | 52.0% | 71% | 40.5 |
+
+Each change on its own moves the LLM off the RNA-only plateau, in a different way:
+
+- **Candidate order is the largest single effect.** With the original order every replicate started on `config_001`. Shuffled, the 5 replicates started on 5 different configurations, and 68% of picks were multimodal. The outcome depends heavily on where it starts: 3 replicates found the optimum by experiment 3-5, while 2 stayed on weaker configurations (0.54 and 0.64).
+- **Stating the budget makes it exploit at the end.** The agent still explores RNA-only models first, but switches to multimodal models in the last one or two experiments (first multimodal pick at experiment 9.6 on average). That raises the final result from 0.653 to 0.706 at little extra compute.
+- **Removing the isolation principles** increases multimodal picks (38%), but the agent still starts on RNA-only models and reaches only 0.677.
+- **All three together** pick only multimodal configurations from the first experiment, find a top-3 configuration in every replicate, and find the optimum in 4 of 5 (0.723 mean after 10). This is the best result of any method, but it is also the most expensive (58 GPU hours versus 40 for random), because multimodal multiprofile models take longest to train.
+
+The original LLM behaviour is therefore mostly caused by the prompt and the candidate ordering, not by an inherent preference of the model for simple configurations. With 5 replicates per variant, these are effect directions rather than precise estimates.
 
 Outputs:
 
 ```text
-results/lookup_replays/<method>.csv        one row per replicate x trial
-results/lookup_replays/llm_logs/           prompts and raw LLM responses per replicate
-analysis/lookup_replay/replay_curves.csv   per method x trial: mean, 95% CI, regret, P(found best / top-3), GPU hours
-analysis/lookup_replay/replay_best_validation.png
+results/lookup_replays/<method>.csv                     one row per replicate x trial
+results/lookup_replays/llm_logs/                        prompts and raw LLM responses per replicate
+analysis/lookup_replay/replay_curves.csv                per method x trial: mean, 95% CI, regret, P(found best / top-3), GPU hours
+analysis/lookup_replay/replay_selection_mix.csv         per method: share of RNA-only / image-only / multimodal picks, first picks
+analysis/lookup_replay/replay_best_validation.png       Random vs Bayesian vs LLM Metrics vs LLM Summary
+analysis/lookup_replay/replay_llm_prompt_ablation.png   LLM prompt variants vs Random
 ```
 
 ---
