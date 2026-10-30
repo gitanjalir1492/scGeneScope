@@ -36,7 +36,7 @@ The optimizer only uses results generated within the Bayesian search condition a
 
 ### LLM Metrics
 
-The LLM Metrics condition uses a fixed language model to choose the next experiment.
+The LLM Metrics condition uses a fixed language model (`openai_gpt54_mini`) to choose the next experiment.
 
 For each decision, the model receives the configurations and validation results from previous experiments within the LLM Metrics trajectory. Validation accuracy is treated as the main optimization objective, with validation F1 used as supporting information.
 
@@ -168,6 +168,12 @@ Each variant uses the same model, 10 replicates and a budget of 10, and is score
 
 Results are reported in the README (Lookup Replays and LLM Prompt Ablation sections).
 
+## LLM Model Comparison
+
+To test whether the LLM results depend on the model, all seven LLM conditions (LLM Metrics, LLM Summary and the five prompt variants) are replayed with two further models from the Novo GenAI gateway: Claude Opus 5.5 (`anthropic_claude_opus_5_5`) and GPT-6 Astra (`openai_gpt6_astra`), selected with `replay_search.py --llm-model`. Everything else is unchanged: prompts, candidate lists, seeds, 10 replicates, a budget of 10, and scoring on the full-training landscape. The only other difference is the output-token limit for decisions and summaries, which is raised from 500/400 to 2,000 for non-default models because their longer reasons otherwise truncate the JSON response. Results for each model are written to separate `models/<model>/` folders, and `model_comparison.csv` reports every condition after 10 experiments per model.
+
+Results are reported in the README (LLM Model Comparison section).
+
 ## Final Evaluation
 
 Proxy performance is not treated as final model performance.
@@ -175,3 +181,7 @@ Proxy performance is not treated as final model performance.
 After the search stage is complete, the strongest configurations selected by each search method will be retrained using the full training setup.
 
 The held-out test set will only be evaluated during this final stage.
+
+## Test-Set Evaluation of the Full Landscape
+
+The saved checkpoint of each of the 51 full-training runs is evaluated once on the held-out test set without retraining (`train=false test=true ckpt_path=...`; `full_landscape/submit_test.sh` and `run_test.sbatch`, run on CPU because no GPU capacity was available). Test accuracy and test F1 are merged into `full_landscape_results.csv` by `collect_results.py`. The test results are not used by any search method or replay; they are only used to check how well the validation objective carries over to held-out data (Spearman rank correlation between validation and test accuracy across configurations, and the test rank of the validation optimum). Results are reported in the README (Test-Set Evaluation of the Full Landscape).

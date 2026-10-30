@@ -45,7 +45,7 @@ This gives me a standard optimization method to compare against both random sear
 
 ## `llm_search.py`
 
-Uses a fixed LLM (`openai_gpt54_mini`) to choose the next experiment.
+Uses a fixed LLM (`openai_gpt54_mini` by default) to choose the next experiment. In the lookup replays, other gateway models can be used with `--llm-model` (see [LLM Model Comparison](#llm-model-comparison)).
 
 I am testing two versions.
 
@@ -107,7 +107,7 @@ Replays the search methods many times on the completed full-training landscape, 
 
 ## `full_landscape/`
 
-SLURM scripts that trained all 51 configurations with the full training setup (one array task per configuration).
+SLURM scripts that trained all 51 configurations with the full training setup (one array task per configuration). `submit_test.sh` / `run_test.sbatch` evaluate the saved checkpoints on the held-out test set, and `collect_results.py` merges everything into `results/full_landscape_results.csv`.
 
 ---
 
@@ -283,6 +283,36 @@ Each change on its own moves the LLM off the RNA-only plateau, in a different wa
 
 The original LLM behaviour is therefore mostly caused by the prompt and the candidate ordering, not by an inherent preference of the model for simple configurations. With 10 replicates per variant, these are effect directions rather than precise estimates.
 
+## LLM Model Comparison
+
+To check whether the results depend on the model, I repeated all seven LLM conditions (10 replicates each) with two larger models available through the gateway: Claude Opus 5.5 (`anthropic_claude_opus_5_5`) and GPT-6 Astra (`openai_gpt6_astra`). Prompts, candidates, seeds and scoring are identical; only the model and the output-token limit (2,000 instead of 500/400, because the larger models write longer reasons) change.
+
+```bash
+python replay_search.py --llm-model anthropic_claude_opus_5_5 --replicates 10 \
+    --methods llm_metrics llm_summary llm_metrics_shuffled llm_metrics_budget llm_metrics_no_isolation llm_metrics_combined llm_metrics_combined_gpu
+python replay_search.py --llm-model openai_gpt6_astra --replicates 10 --methods ...   # same seven methods
+```
+
+Mean best validation accuracy after 10 experiments / fraction of replicates that found the optimum / mean GPU hours for 10:
+
+| Condition | GPT-5.4 mini | Claude Opus 5.5 | GPT-6 Astra |
+| --- | --- | --- | --- |
+| LLM Metrics | 0.653 / 0% / 9.6 | 0.717 / 50% / 41.0 | 0.706 / 0% / 21.8 |
+| LLM Summary | 0.659 / 0% / 19.6 | 0.707 / 0% / 67.9 | 0.719 / 70% / 24.7 |
+| Shuffled | 0.697 / 80% / 34.7 | 0.710 / 30% / 50.6 | 0.720 / 50% / 22.4 |
+| Budget | 0.694 / 40% / 14.7 | 0.717 / 10% / 46.9 | 0.725 / 100% / 21.7 |
+| No isolation | 0.678 / 20% / 32.4 | 0.725 / 100% / 35.9 | 0.722 / 60% / 84.9 |
+| Combined | 0.724 / 90% / 55.4 | 0.725 / 100% / 38.2 | 0.725 / 100% / 39.8 |
+| Combined + GPU-aware | 0.725 / 100% / 50.9 | 0.725 / 100% / 38.7 | 0.725 / 100% / 41.5 |
+| Random (reference) | 0.703 / 24.5% / 40.5 | | |
+
+- **Both larger models beat GPT-5.4 mini and random search under the original prompts**, but they still follow the prompt's ablation strategy: every replicate of LLM Metrics and LLM Summary starts on `config_001`, and the first multimodal pick comes late (experiment 4.6-7.0 on average). Opus reaches multimodal models in time to find the optimum in 5 of 10 LLM Metrics replicates; every GPT-6 Astra LLM Metrics replicate plateaus at the 5th-best configuration (0.706).
+- **The prompt fixes matter less for the larger models but still help.** With the combined prompt all three models find the optimum in (almost) every replicate, so the model choice mostly changes cost: Opus and GPT-6 Astra need 38-42 GPU hours, about the same as random search, versus 51-55 for GPT-5.4 mini.
+- **The models respond differently to single changes.** Stating the budget is enough for GPT-6 Astra (optimum in 10 of 10 at 21.7 GPU hours, the cheapest condition that reliably finds it), but not for Opus (1 of 10). Removing the isolation principles is enough for Opus (10 of 10) but makes GPT-6 Astra pick almost only multimodal configurations (98%), the most expensive condition (84.9 GPU hours).
+- **Opus uses the most compute** in four of the five conditions without combined changes (41-68 GPU hours); GPT-6 Astra stays at 22-25 GPU hours in all of them except No isolation.
+
+As before, 10 replicates per cell give effect directions, not precise estimates.
+
 Outputs:
 
 ```text
@@ -292,6 +322,9 @@ analysis/lookup_replay/replay_curves.csv                per method x trial: mean
 analysis/lookup_replay/replay_selection_mix.csv         per method: share of RNA-only / image-only / multimodal picks, first picks
 analysis/lookup_replay/replay_best_validation.png       Random vs Bayesian vs LLM Metrics vs LLM Summary
 analysis/lookup_replay/replay_llm_prompt_ablation.png   LLM prompt variants vs Random
+results/lookup_replays/models/<model>/                  the same replay files for a non-default --llm-model
+analysis/lookup_replay/models/<model>/                  the same analysis files for a non-default --llm-model
+analysis/lookup_replay/model_comparison.{csv,png}       all LLM conditions after 10 experiments, per model
 ```
 
 ---
@@ -316,7 +349,7 @@ Proxy training of all 51 configurations.
 
 ### `results/full_landscape_results.csv`
 
-Full training of all 51 configurations, with epochs trained, runtime and SLURM metadata.
+Full training of all 51 configurations, with epochs trained, runtime, SLURM metadata, and held-out test accuracy and F1 (`test_accuracy`, `test_f1`).
 
 ### `results/lookup_replays/`
 
@@ -347,3 +380,21 @@ The main comparison is best validation accuracy found versus number of experimen
 The proxy runs are for choosing configurations, not for reporting final model performance.
 
 After the search experiments are complete, the strongest configurations found by each method will be trained using the full training setup. The held-out test set will only be used for this final evaluation.
+
+## Test-Set Evaluation of the Full Landscape
+
+All 51 full-training checkpoints were evaluated once on the held-out test set (no retraining; `full_landscape/submit_test.sh`, run on CPU). The test results were not used by any search method.
+
+Test accuracy is much lower than validation accuracy (typically by 0.15-0.25), and the two rank configurations only moderately alike (Spearman 0.52 across the 51 configurations).
+
+| Configuration | Val accuracy (rank) | Test accuracy (rank) |
+| --- | --- | --- |
+| multimodal, multiprofile, Transformer, scVI-200 + weighted ImageNet ViT-L | 0.725 (1) | 0.498 (12) |
+| multimodal, multiprofile, Transformer, scVI-200 + concat ImageNet ViT-L | 0.721 (2) | 0.493 |
+| multimodal, multiprofile, avgpool, scVI-200 + concat ImageNet ViT-L | 0.715 (3) | 0.539 |
+| multimodal, multiprofile, Transformer, scVI-200 + weighted ResNet50 | 0.713 (4) | 0.545 (4) |
+| multimodal, multiprofile, avgpool, scVI-200 + weighted ImageNet ViT-L | 0.706 (5) | 0.549 (3) |
+| multimodal, multiprofile, avgpool, scVI-200 + weighted ResNet50 | 0.678 (7) | **0.589 (1)** |
+| RNA-only, multiprofile, avgpool, scVI-200 | 0.650 (9) | 0.561 (2) |
+
+The validation optimum, which the search methods are scored on, is only 12th on the test set, and avgpool models generally hold up better on test than Transformer-aggregation models. Finding the validation optimum faster therefore does not translate directly into a better test result; the search comparison above measures search efficiency on the validation objective only.
