@@ -41,7 +41,8 @@ cd "$REPO"
     test=true \
     "ckpt_path='$CKPT'" \
     "seed=$SEED" \
-    trainer.deterministic=warn
+    trainer.deterministic=warn \
+    ${TEST_EXTRA_ARGS:-}
 
 mkdir -p "$(dirname "$OUT_JSON")"
 "$PYTHON" - "$TEST_DIR" "$CKPT" "$OUT_JSON" <<'PY'

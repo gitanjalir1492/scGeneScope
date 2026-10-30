@@ -6,7 +6,11 @@ search (random_search, bayesian_search, llm_search, summarize_experiment). LLM m
 
     python replay_search.py --methods random bayesian --replicates 200
     python replay_search.py --methods llm_metrics llm_summary --replicates 5
+    python replay_search.py --methods llm_metrics --replicates 10 --llm-model anthropic_claude_opus_5_5
     python replay_search.py --analyze-only
+
+Replays with a non-default --llm-model are written to results/lookup_replays/models/<model>/ and
+analysis/lookup_replay/models/<model>/; analysis/lookup_replay/model_comparison.csv compares all models.
 """
 
 import argparse
@@ -35,6 +39,8 @@ LANDSCAPES = {
 }
 REPLAY_DIR = SEARCH_DIR / "results" / "lookup_replays"
 OUTPUT_DIR = SEARCH_DIR / "analysis" / "lookup_replay"
+BASE_REPLAY_DIR, BASE_OUTPUT_DIR = REPLAY_DIR, OUTPUT_DIR
+DEFAULT_LLM_MODEL = llm_search.LLM_MODEL
 # Prompt variants: shuffle = random candidate order and IDs per replicate; budget = state experiment k of N and
 # make best-found accuracy the only objective; isolation = keep the one-factor-at-a-time / complexity principles;
 # gpu = show measured GPU hours of completed runs and ask to keep total GPU hours low
@@ -186,6 +192,10 @@ def bootstrap_ci(values: np.ndarray, rng) -> tuple[float, float]:
 
 def analyze():
     frames = [pd.read_csv(path) for path in sorted(REPLAY_DIR.glob("*.csv"))]
+    if REPLAY_DIR != BASE_REPLAY_DIR:
+        # Non-LLM reference methods are model-independent, so reuse the default replays
+        frames += [pd.read_csv(BASE_REPLAY_DIR / f"{m}.csv") for m in ("random", "bayesian")
+                   if (BASE_REPLAY_DIR / f"{m}.csv").exists()]
     if not frames:
         raise RuntimeError(f"No replay files in {REPLAY_DIR}")
     trials = pd.concat(frames, ignore_index=True)
@@ -239,6 +249,49 @@ def analyze():
     print(f"Saved {OUTPUT_DIR}")
 
 
+def compare_models():
+    """Final (trial 10) metrics per LLM variant for the default model and every model under models/."""
+    sources = {DEFAULT_LLM_MODEL: BASE_OUTPUT_DIR / "replay_curves.csv"}
+    sources.update({path.parent.name: path for path in sorted((BASE_OUTPUT_DIR / "models").glob("*/replay_curves.csv"))})
+    tables = []
+    for model, path in sources.items():
+        if not path.exists():
+            continue
+        curves = pd.read_csv(path)
+        curves = curves.loc[curves["method"].isin(LLM_VARIANTS)]
+        tables.append(curves.loc[curves["trial"].eq(curves["trial"].max())].assign(model=model))
+    if len(tables) < 2:
+        return
+    table = pd.concat(tables, ignore_index=True)
+    columns = ["method", "model", "n_replicates", "mean_best_val_accuracy", "ci95_low", "ci95_high",
+               "p_found_best", "p_found_top3", "mean_cumulative_gpu_hours"]
+    table = table[columns].sort_values(["method", "model"])
+    table.to_csv(BASE_OUTPUT_DIR / "model_comparison.csv", index=False)
+    print("\nModel comparison (after the full budget):")
+    print(table.to_string(index=False, float_format=lambda v: f"{v:.3f}"))
+
+    methods = [m for m in LLM_VARIANTS if m in set(table["method"])]
+    models = list(dict.fromkeys(table["model"]))
+    width = 0.8 / len(models)
+    fig, axes = plt.subplots(1, 2, figsize=(16, 5.5))
+    for i, model in enumerate(models):
+        sub = table.loc[table["model"].eq(model)].set_index("method").reindex(methods)
+        x = np.arange(len(methods)) + (i - (len(models) - 1) / 2) * width
+        error = np.vstack([sub["mean_best_val_accuracy"] - sub["ci95_low"], sub["ci95_high"] - sub["mean_best_val_accuracy"]])
+        axes[0].bar(x, sub["mean_best_val_accuracy"], width, yerr=np.nan_to_num(error), capsize=3, label=model)
+        axes[1].bar(x, sub["p_found_best"], width, label=model)
+    for ax, ylabel in zip(axes, ["Best validation accuracy after budget (95% CI)", "Fraction of replicates finding the optimum"]):
+        ax.set_xticks(range(len(methods)), [m.removeprefix("llm_") for m in methods], rotation=30, ha="right")
+        ax.set_ylabel(ylabel)
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.legend(frameon=False, fontsize=9)
+    axes[0].set_ylim(0.6, 0.74)
+    axes[1].set_ylim(0, 1.02)
+    fig.tight_layout()
+    fig.savefig(BASE_OUTPUT_DIR / "model_comparison.png", dpi=200)
+    plt.close(fig)
+
+
 def plot_curves(curves, optimum, methods, path):
     fig, axes = plt.subplots(1, 3, figsize=(18, 5.5))
     for method in methods:
@@ -274,13 +327,29 @@ def main():
                         help="Validation scores the methods see as feedback (results are always scored on full).")
     parser.add_argument("--startup-trials", type=int, default=3, help="Same default as bayesian_search.py.")
     parser.add_argument("--analyze-only", action="store_true")
+    parser.add_argument("--llm-model", default=DEFAULT_LLM_MODEL, help="Gateway model id for the LLM methods.")
+    parser.add_argument("--max-output-tokens", type=int, default=None,
+                        help="Decision/summary output limit; default 500/400 for the default model, 2000 otherwise.")
     args = parser.parse_args()
+
+    global REPLAY_DIR, OUTPUT_DIR
+    llm_search.LLM_MODEL = summarize_experiment.LLM_MODEL = args.llm_model
+    # Other models write longer reasons; the default limits truncate their JSON
+    tokens = args.max_output_tokens or (None if args.llm_model == DEFAULT_LLM_MODEL else 2000)
+    if tokens:
+        llm_search.LLM_MAX_OUTPUT_TOKENS = summarize_experiment.SUMMARY_MAX_OUTPUT_TOKENS = tokens
+    if args.llm_model != DEFAULT_LLM_MODEL:
+        REPLAY_DIR = BASE_REPLAY_DIR / "models" / args.llm_model
+        OUTPUT_DIR = BASE_OUTPUT_DIR / "models" / args.llm_model
+        if not set(args.methods) <= set(LLM_VARIANTS) and not args.analyze_only:
+            parser.error("--llm-model only applies to LLM methods; random/bayesian replays are shared")
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     if not args.analyze_only:
         for method in args.methods:
             run_method(method, args.replicates, args.landscape, args.budget, args.startup_trials)
     analyze()
+    compare_models()
 
 
 if __name__ == "__main__":

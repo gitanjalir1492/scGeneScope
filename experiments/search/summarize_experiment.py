@@ -7,6 +7,8 @@ import os
 from llm_search import LLM_MODEL
 from results_io import atomic_write_csv
 
+SUMMARY_MAX_OUTPUT_TOKENS = 400
+
 
 SEARCH_DIR = Path(__file__).resolve().parent
 RESULTS_PATH = Path(
@@ -228,7 +230,7 @@ def query_llm(prompt):
     response = client.responses.create(
         model=LLM_MODEL,
         input=prompt,
-        max_output_tokens=400,
+        max_output_tokens=SUMMARY_MAX_OUTPUT_TOKENS,
     )
 
     text = response.output_text

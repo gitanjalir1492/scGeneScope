@@ -1,3 +1,4 @@
+import argparse
 import csv
 import math
 import random
@@ -12,6 +13,7 @@ import matplotlib.pyplot as plt
 SEARCH_DIR = Path(__file__).resolve().parent
 RESULTS_DIR = SEARCH_DIR / "results"
 OUTPUT_DIR = SEARCH_DIR / "analysis" / "landscape"
+LANDSCAPE = "proxy"
 
 SHARD_FILES = [
     RESULTS_DIR / "proxy_landscape_gpu1.csv",
@@ -59,6 +61,10 @@ RANDOM_SEED = 12345
 
 def read_rows():
     rows = []
+
+    if LANDSCAPE == "full":
+        with (RESULTS_DIR / "full_landscape_results.csv").open(newline="", encoding="utf-8") as f:
+            return list(csv.DictReader(f))
 
     for path in SHARD_FILES:
         if not path.exists():
@@ -160,6 +166,14 @@ def probability_hit_at_least_one(n, k, budget):
 
 
 def main():
+    global LANDSCAPE, OUTPUT_DIR
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--landscape", choices=["proxy", "full"], default="proxy")
+    LANDSCAPE = parser.parse_args().landscape
+    if LANDSCAPE == "full":
+        OUTPUT_DIR = SEARCH_DIR / "analysis" / "landscape_full"
+    label = LANDSCAPE.capitalize()
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     rows = read_rows()
@@ -496,7 +510,7 @@ def main():
 
     plt.figure(figsize=(7, 5))
     plt.hist(accuracies, bins=min(12, max(5, len(accuracies))))
-    plt.xlabel("Proxy validation accuracy")
+    plt.xlabel(f"{label} validation accuracy")
     plt.ylabel("Number of configurations")
     plt.title("Configuration Performance Landscape")
     plt.tight_layout()
@@ -518,8 +532,8 @@ def main():
 
         plt.figure(figsize=(7, 5))
         plt.scatter(x, y)
-        plt.xlabel("Proxy runtime (minutes)")
-        plt.ylabel("Proxy validation accuracy")
+        plt.xlabel(f"{label} runtime (minutes)")
+        plt.ylabel(f"{label} validation accuracy")
         plt.title("Performance vs Experiment Cost")
         plt.tight_layout()
         plt.savefig(

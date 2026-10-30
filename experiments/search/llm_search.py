@@ -26,6 +26,7 @@ LLM_LOG_DIR = SEARCH_DIR / "llm_logs"
 # Keep this fixed for every LLM search condition so that the only
 # experimental difference is the memory supplied to the model.
 LLM_MODEL = "openai_gpt54_mini"
+LLM_MAX_OUTPUT_TOKENS = 500
 
 FIELDS = [
     "experiment_id",
@@ -424,7 +425,7 @@ def query_llm(
     response = client.responses.create(
         model=LLM_MODEL,
         input=prompt,
-        max_output_tokens=500,
+        max_output_tokens=LLM_MAX_OUTPUT_TOKENS,
     )
 
     response_text = response.output_text
