@@ -29,6 +29,8 @@ EXTRA_FIELDS = [
     "node",
     "gpu_name",
     "restart_count",
+    "test_loss",
+    "test_checkpoint",
 ]
 
 
@@ -93,6 +95,11 @@ def main() -> None:
         if row["run_directory"] and Path(row["run_directory"]).exists():
             row.update(training_length(Path(row["run_directory"])))
 
+        test_json = args.out_root / "results" / "test_rows" / f"{exp_id}.json"
+        if test_json.exists():
+            test = json.loads(test_json.read_text())
+            row.update({k: test[k] for k in ("test_accuracy", "test_f1", "test_loss", "test_checkpoint")})
+
         merged.append(row)
 
     output = args.out_root / "results" / "full_landscape_results.csv"
@@ -104,6 +111,7 @@ def main() -> None:
     print(f"Runs that hit max_epochs: {hit_cap or 'none'}")
     hours = sum(float(r["runtime_hours"]) for r in merged if r["runtime_hours"])
     print(f"Total GPU-hours so far: {hours:.1f}")
+    print(f"Test-set evaluated: {sum(1 for r in merged if r['test_accuracy'])}/{len(merged)}")
 
 
 if __name__ == "__main__":
