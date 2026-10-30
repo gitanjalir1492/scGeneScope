@@ -164,7 +164,7 @@ To test these, I replay the LLM Metrics condition with prompt variants that each
 | `llm_metrics_combined` | All three changes. |
 | `llm_metrics_combined_gpu` | All three changes, plus compute awareness: each completed experiment shows its measured training cost in GPU hours, the history starts with the total GPU hours used so far, and the agent is asked to reach the best validation accuracy while keeping total GPU hours low (prefer a cheaper configuration when expected accuracy is similar, but do not avoid an expensive configuration that is likely to be best). Costs of untested configurations are not shown and must be estimated from the architecture. |
 
-Each variant uses the same model, 5 replicates and a budget of 10, and is scored on the full-training landscape. Besides best-found accuracy, I record the share of selections per model setting, how many distinct first picks were made, the mean experiment number of the first multimodal selection, and the number of replicates that never selected a multimodal configuration.
+Each variant uses the same model, 10 replicates and a budget of 10, and is scored on the full-training landscape. Besides best-found accuracy, I record the share of selections per model setting, how many distinct first picks were made, the mean experiment number of the first multimodal selection, and the number of replicates that never selected a multimodal configuration.
 
 Results are reported in the README (Lookup Replays and LLM Prompt Ablation sections).
 

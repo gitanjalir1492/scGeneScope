@@ -234,8 +234,8 @@ Each replicate starts with no history, uses its own seed, has a budget of 10 exp
 
 ```bash
 python replay_search.py --methods random bayesian --replicates 200
-python replay_search.py --methods llm_metrics llm_summary --replicates 5   # needs LLM credentials, see below
-python replay_search.py --methods llm_metrics_shuffled llm_metrics_budget llm_metrics_no_isolation llm_metrics_combined llm_metrics_combined_gpu --replicates 5
+python replay_search.py --methods llm_metrics llm_summary --replicates 10   # needs LLM credentials, see below
+python replay_search.py --methods llm_metrics_shuffled llm_metrics_budget llm_metrics_no_isolation llm_metrics_combined llm_metrics_combined_gpu --replicates 10
 python replay_search.py --analyze-only
 ```
 
@@ -252,12 +252,12 @@ Mean best validation accuracy found (full training), with 95% bootstrap CI acros
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Random | 200 | 0.629 (0.618-0.640) | 0.663 (0.655-0.672) | 0.703 (0.699-0.707) | 24.5% | 52.0% | 40.5 |
 | Bayesian (TPE) | 200 | 0.590 (0.580-0.601) | 0.650 (0.641-0.658) | 0.695 (0.691-0.700) | 15.0% | 42.0% | 32.4 |
-| LLM Metrics | 5 | 0.520 (0.520-0.520) | 0.652 (0.651-0.653) | 0.653 (0.653-0.653) | 0% | 0% | 8.4 |
-| LLM Summary | 5 | 0.560 (0.520-0.612) | 0.653 (0.653-0.653) | 0.658 (0.653-0.668) | 0% | 0% | 15.4 |
+| LLM Metrics | 10 | 0.534 (0.520-0.555) | 0.652 (0.651-0.653) | 0.653 (0.653-0.653) | 0% | 0% | 9.6 |
+| LLM Summary | 10 | 0.586 (0.553-0.619) | 0.653 (0.652-0.653) | 0.659 (0.653-0.667) | 0% | 0% | 19.6 |
 
 With 10 experiments, TPE does slightly worse than random. Its conditional parameterization picks the model setting first, so multimodal configurations (36 of 51, and all of the top ones) are chosen about 50% of the time instead of 71% under uniform random selection, and 10 trials are too few for TPE to correct this.
 
-Both LLM conditions do worse than random. They spent 76-84% of their experiments on RNA-only models, and every LLM Metrics replicate started with the same configuration (`config_001`, RNA-only single-profile PCA) and plateaued at 0.653, the best RNA-only model. Their selection reasons describe a one-factor-at-a-time ablation from the simplest baseline rather than a search for the best model. The replicates are nearly deterministic, so the narrow CIs reflect how similar the trajectories are, not a precise estimate.
+Both LLM conditions do worse than random. They spent 77-87% of their experiments on RNA-only models. Every LLM Metrics replicate (and 9 of 10 LLM Summary replicates) started with the same configuration (`config_001`, RNA-only single-profile PCA), and all LLM Metrics replicates plateaued at 0.653, the best RNA-only model. Their selection reasons describe a one-factor-at-a-time ablation from the simplest baseline rather than a search for the best model. The replicates are nearly deterministic, so the narrow CIs reflect how similar the trajectories are, not a precise estimate.
 
 ## LLM Prompt Ablation
 
@@ -265,23 +265,23 @@ To find out why the LLMs stay on RNA-only models, I replayed LLM Metrics with pr
 
 | Variant | Change | After 3 | After 5 | After 10 | Found optimum by 10 | Found a top-3 config by 10 | Multimodal share of picks | Mean GPU hours for 10 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| LLM Metrics | none (original prompt) | 0.520 | 0.652 | 0.653 (0.653-0.653) | 0% | 0% | 2% | 8.4 |
-| Shuffled | random candidate order and IDs | 0.631 | 0.649 | 0.670 (0.612-0.725) | 60% | 60% | 68% | 33.5 |
-| Budget | states "experiment k of 10"; best-found accuracy is the only goal | 0.572 | 0.652 | 0.706 (0.689-0.723) | 40% | 40% | 14% | 10.7 |
-| No isolation | removes one-factor-at-a-time and "complex is not better" principles | 0.611 | 0.642 | 0.677 (0.653-0.702) | 0% | 20% | 38% | 37.1 |
-| Combined | all three changes | 0.666 | 0.679 | 0.723 (0.719-0.725) | 80% | 100% | 100% | 58.4 |
-| Combined + GPU-aware | all three, plus measured GPU hours of completed runs and an instruction to keep total GPU hours low | 0.683 | 0.707 | 0.725 (0.725-0.725) | 100% | 100% | 96% | 49.0 |
+| LLM Metrics | none (original prompt) | 0.534 | 0.652 | 0.653 (0.653-0.653) | 0% | 0% | 2% | 9.6 |
+| Shuffled | random candidate order and IDs | 0.593 | 0.649 | 0.697 (0.660-0.725) | 80% | 80% | 69% | 34.7 |
+| Budget | states "experiment k of 10"; best-found accuracy is the only goal | 0.546 | 0.653 | 0.694 (0.675-0.713) | 40% | 40% | 17% | 14.7 |
+| No isolation | removes one-factor-at-a-time and "complex is not better" principles | 0.606 | 0.636 | 0.678 (0.657-0.699) | 20% | 30% | 40% | 32.4 |
+| Combined | all three changes | 0.676 | 0.700 | 0.724 (0.722-0.725) | 90% | 100% | 100% | 55.4 |
+| Combined + GPU-aware | all three, plus measured GPU hours of completed runs and an instruction to keep total GPU hours low | 0.691 | 0.715 | 0.725 (0.725-0.725) | 100% | 100% | 98% | 50.9 |
 | Random (reference) | | 0.629 | 0.663 | 0.703 (0.699-0.707) | 24.5% | 52.0% | 71% | 40.5 |
 
 Each change on its own moves the LLM off the RNA-only plateau, in a different way:
 
-- **Candidate order is the largest single effect.** With the original order every replicate started on `config_001`. Shuffled, the 5 replicates started on 5 different configurations, and 68% of picks were multimodal. The outcome depends heavily on where it starts: 3 replicates found the optimum by experiment 3-5, while 2 stayed on weaker configurations (0.54 and 0.64).
-- **Stating the budget makes it exploit at the end.** The agent still explores RNA-only models first, but switches to multimodal models in the last one or two experiments (first multimodal pick at experiment 9.6 on average). That raises the final result from 0.653 to 0.706 at little extra compute.
-- **Removing the isolation principles** increases multimodal picks (38%), but the agent still starts on RNA-only models and reaches only 0.677.
-- **All three together** pick only multimodal configurations from the first experiment, find a top-3 configuration in every replicate, and find the optimum in 4 of 5 (0.723 mean after 10). This is the best result of any method, but it is also the most expensive (58 GPU hours versus 40 for random), because multimodal multiprofile models take longest to train.
-- **Adding GPU-hour awareness** to the combined prompt found the optimum in all 5 replicates (on average at experiment 3.8) and cut the compute for 10 experiments from 58 to 49 GPU hours, by choosing cheaper multimodal configurations (4.9 instead of 5.8 GPU hours per experiment). It did not reach the optimum with fewer GPU hours (18.9 versus 14.3 for the combined prompt, among replicates that found it). It still uses more compute than random search (40 GPU hours), because it keeps spending the whole budget on multimodal models after it has found the optimum. Letting the agent stop early would be the next step to save compute.
+- **Candidate order is the largest single effect.** With the original order every replicate started on `config_001`. Shuffled, the 10 replicates started on 8 different configurations, and 69% of picks were multimodal. The outcome depends on where it starts: 8 replicates found the optimum (on average at experiment 5.5), while 2 stayed on weaker configurations (0.54 and 0.64).
+- **Stating the budget makes it exploit at the end.** The agent still explores RNA-only models first, but switches to multimodal models in the last one or two experiments (first multimodal pick at experiment 9.3 on average). That raises the final result from 0.653 to 0.694, and 4 of 10 replicates find the optimum with their last experiment, at modest extra compute (14.7 versus 9.6 GPU hours).
+- **Removing the isolation principles** increases multimodal picks (40%), but the agent still starts on RNA-only models and reaches only 0.678 (optimum found in 2 of 10).
+- **All three together** pick only multimodal configurations from the first experiment, find a top-3 configuration in every replicate, and find the optimum in 9 of 10 (0.724 mean after 10). It is also expensive (55 GPU hours versus 40 for random), because multimodal multiprofile models take longest to train.
+- **Adding GPU-hour awareness** to the combined prompt found the optimum in all 10 replicates (on average at experiment 3.4) and cut the compute for 10 experiments from 55 to 51 GPU hours, by choosing slightly cheaper multimodal configurations (5.1 instead of 5.5 GPU hours per experiment). GPU hours spent until the optimum was found were similar (15.6 versus 16.2 for the combined prompt, among replicates that found it). It still uses more compute than random search (40 GPU hours), because it keeps spending the whole budget on multimodal models after it has found the optimum. Letting the agent stop early would be the next step to save compute.
 
-The original LLM behaviour is therefore mostly caused by the prompt and the candidate ordering, not by an inherent preference of the model for simple configurations. With 5 replicates per variant, these are effect directions rather than precise estimates.
+The original LLM behaviour is therefore mostly caused by the prompt and the candidate ordering, not by an inherent preference of the model for simple configurations. With 10 replicates per variant, these are effect directions rather than precise estimates.
 
 Outputs:
 
