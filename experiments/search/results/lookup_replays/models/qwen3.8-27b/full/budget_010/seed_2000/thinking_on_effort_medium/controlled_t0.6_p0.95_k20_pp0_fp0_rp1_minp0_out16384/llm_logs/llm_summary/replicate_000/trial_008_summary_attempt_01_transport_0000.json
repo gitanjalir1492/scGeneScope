@@ -1,0 +1,102 @@
+{
+  "attempt": 1,
+  "effective_sampling": null,
+  "kind": "summary",
+  "latency_seconds": 12.382431888021529,
+  "method": "llm_summary",
+  "normalized": {
+    "final_chars": 941,
+    "finish_reason": "stop",
+    "reasoning": "Let me analyze the experiment results to write a proper summary.\n\nCurrent experiment (llm_summary_008):\n- Multimodal, multiprofile\n- RNA encoder: scvi_n200\n- Image encoder: resnet50\n- Aggregation: avgpool\n- Fusion: weighted\n- Validation accuracy: 0.677616 (~67.8%)\n- Validation F1: 0.646409 (~64.6%)\n\nKey comparison: This is directly comparable to llm_summary_007 (config_030), which used the exact same settings but with concat fusion instead of weighted fusion. The only difference is fusion: concat \u2192 weighted.\n\n- llm_summary_007 (concat): accuracy ~63.2%, F1 ~60.7%\n- llm_summary_008 (weighted): accuracy ~67.8%, F1 ~64.6%\n\nThis is a ~4.6-point improvement in accuracy and ~3.9-point improvement in F1 from switching concat to weighted fusion.\n\nAlso compare to RNA-only baseline (llm_summary_004): accuracy ~65.0%, F1 ~62.8%\n\nSo weighted fusion multimodal (~67.8%) now exceeds the RNA-only multiprofile baseline (~65.0%) by about 2.8 points.\n\nThis is a single-variable comparison (only fusion changed from concat to weighted), so we CAN say the fusion strategy change accounts for the difference. The reason selected explicitly states this is a single-variable comparison isolating the fusion strategy.\n\nWhat was tested: Weighted fusion replacing concat fusion in the multimodal multiprofile setup (scvi_n200 + ResNet50, avgpool).\n\nWhat the validation result suggests: Weighted fusion substantially outperforms concat fusion (~67.8% vs ~63.2%), a ~4.6-point gain, and now exceeds the RNA-only multiprofile baseline (~65.0%). This indicates the image modality does carry complementary signal that concat fails to exploit, and weighted fusion is better at down-weighting the weaker image contribution.\n\nWhat remains uncertain: Whether even stronger image encoders or different aggregation for the image branch could push further, whether attention-based fusion could do better than weighted, whether the ~67.8% is near the ceiling, and whether the improvement is robust.\n\nLet me write a 2-4 sentence summary.\n",
+    "reasoning_chars": 2011,
+    "text": "{\n  \"summary\": \"This experiment isolated the fusion mechanism by replacing concat with weighted fusion in the otherwise identical multimodal, multiprofile configuration (scvi_n200 + ResNet50, avgpool), directly comparable to llm_summary_007. Validation accuracy rose from ~63.2% to ~67.8% (F1 from ~60.7% to ~64.6%), a ~4.6-point gain attributable to the fusion change, and now exceeds the RNA-only multiprofile avgpool baseline (~65.0%, llm_summary_004) by ~2.8 points, indicating that the image modality does carry complementary signal that concat fails to exploit and that weighted fusion effectively down-weights the weaker image contribution. It remains uncertain whether attention-based or learned fusion could push further beyond ~67.8%, whether stronger image encoders or image-specific aggregation could amplify the residual image contribution, and whether this gain is stable across different data splits or task formulations.\"\n}",
+    "usage": {
+      "completion_tokens": 750,
+      "completion_tokens_details": {
+        "reasoning_tokens": 531
+      },
+      "prompt_tokens": 2387,
+      "prompt_tokens_details": null,
+      "total_tokens": 3137
+    }
+  },
+  "prompt_sha256": "54aa5ebbf99a0a83b98931d848574789b86fda3f9900e1f8143ba83edc686497",
+  "prompt_token_sha256": null,
+  "prompt_tokens_preflight": null,
+  "protocol_hash": "ee10983caaa8a9c3da9086ab092ea6d7431c1da839c9cb8c642fbc2f2cbd73bc",
+  "replicate": 0,
+  "replicate_seed": 2000,
+  "request": {
+    "chat_template_kwargs": {
+      "enable_thinking": true,
+      "preserve_thinking": false
+    },
+    "frequency_penalty": 0.0,
+    "max_tokens": 16384,
+    "messages": [
+      {
+        "content": "You are maintaining scientific memory for a sequential ML model-search\nstudy in multimodal cellular profiling.\n\nSummarize the completed experiment below so that another ML research\nagent can use the summary when choosing future experiments.\n\nThe summary should explain:\n1. what was tested,\n2. what the validation result suggests,\n3. what remains uncertain.\n\nImportant:\n- Base conclusions only on the information provided.\n- Validation accuracy is the primary metric.\n- Validation F1 is supporting evidence.\n- Do not mention held-out test performance.\n- Do not claim that one design choice caused a performance difference\n  unless the available evidence isolates that design choice.\n- If there is insufficient comparative evidence, describe the result as\n  an initial observation or baseline.\n- Preserve uncertainty.\n- Keep the summary to approximately 2 to 4 sentences.\n\nCurrent experiment:\nExperiment ID: llm_summary_008\n\nConfiguration:\nModel setting: multimodal\nProfile setting: multiprofile\nRNA encoder: scvi_n200\nImage encoder: resnet50\nAggregation: avgpool\nFusion: weighted\n\nReason selected:\nThe strongest RNA-only multiprofile baseline (scvi_n200, avgpool) achieves ~65.0% accuracy, but adding the image modality via concat fusion (config_030) actually *decreased* performance to ~63.2%. The critical uncertainty is whether this ~1.8-point drop is caused by the concat fusion mechanism (which treats both modalities equally and cannot down-weight a weak signal) or by the image content itself being non-complementary. Config_031 changes only the fusion from concat to weighted, keeping all other settings identical to config_030 (scvi_n200, ResNet50, multiprofile, avgpool). This single-variable comparison isolates the fusion strategy: if weighted fusion recovers to \u226565%, it indicates the image carries complementary signal that concat fails to exploit; if it remains below 65%, it strongly suggests the ResNet50-encoded image is fundamentally non-complementary under this setup, saving budget from further image-encoder or aggregation variants. This is the most information-dense next experiment because it directly addresses the key open question (can multimodal beat RNA-only?) with minimal confounding, and the answer will determine whether subsequent budget should go toward stronger image encoders or toward RNA-only encoder exploration (e.g., scgpt).\n\nValidation accuracy:\n0.677616\n\nValidation F1:\n0.646409\n\nPrevious completed llm_summary experiments:\nExperiment ID: llm_summary_001\nModel setting: rna_only\nProfile setting: singleprofile\nRNA encoder: pca_n2000\nImage encoder: None\nAggregation: None\nFusion: None\nValidation accuracy: 0.484925\nValidation F1: 0.463917\nExperiment summary: This first experiment established a baseline using an RNA-only, single-profile model with PCA (2000 components) and no image modality, aggregation, or fusion. The validation accuracy of ~48.5% (F1 ~46.4%) is an initial observation indicating that the raw PCA-reduced RNA signal alone yields modest predictive performance, though it is unclear whether this reflects the ceiling for RNA-only approaches or simply the floor before added complexity. It remains uncertain whether learned encoders, multiprofile aggregation, image modality, or cross-modal fusion could substantially improve beyond this baseline, and whether the task is broadly solvable at higher accuracy levels.\n\nExperiment ID: llm_summary_002\nModel setting: image_only\nProfile setting: singleprofile\nRNA encoder: None\nImage encoder: resnet50\nAggregation: None\nFusion: None\nValidation accuracy: 0.207893\nValidation F1: 0.171760\nExperiment summary: This experiment established an image-only, single-profile baseline using a ResNet50 encoder with no aggregation or fusion, yielding a validation accuracy of ~20.8% (F1 ~17.2%), which is substantially lower than the RNA-only PCA baseline of ~48.5%. This initial observation suggests that, under this configuration, the image modality carries considerably weaker independent predictive signal than the RNA modality, though the comparison is confounded by differing encoder choices (learned ResNet50 vs. linear PCA) and cannot definitively isolate modality as the sole cause of the gap. It remains uncertain whether alternative image encoders, multiprofile aggregation, or a different architectural setup could substantially improve the image signal, and whether even a weak image contribution might still add value in a multimodal fusion setting.\n\nExperiment ID: llm_summary_003\nModel setting: rna_only\nProfile setting: singleprofile\nRNA encoder: scvi_n200\nImage encoder: None\nAggregation: None\nFusion: None\nValidation accuracy: 0.520276\nValidation F1: 0.498214\nExperiment summary: This experiment isolated the effect of representation quality by replacing the linear PCA-2000 encoder with a learned scvi_n200 variational autoencoder in the otherwise identical RNA-only, single-profile configuration. The validation accuracy improved from ~48.5% (F1 ~46.4%) to ~52.0% (F1 ~49.8%), a modest ~3.5-point gain that indicates a learned nonlinear encoder captures some additional structure beyond linear PCA, yet the relatively small improvement also suggests the single-profile RNA signal may be partially data-limited rather than purely representation-limited. It remains uncertain whether this encoder advantage would compound in multiprofile aggregation or multimodal fusion settings, and whether the ~52% level is near the practical ceiling for RNA-only single-profile models or whether further architectural changes could yield substantially larger gains.\n\nExperiment ID: llm_summary_004\nModel setting: rna_only\nProfile setting: multiprofile\nRNA encoder: scvi_n200\nImage encoder: None\nAggregation: avgpool\nFusion: None\nValidation accuracy: 0.650124\nValidation F1: 0.627507\nExperiment summary: This experiment tested the effect of multiprofile aggregation via avgpool on the RNA-only, scvi_n200 configuration, directly comparable to the single-profile scvi_n200 baseline (llm_summary_003). The validation accuracy rose from ~52.0% to ~65.0% (F1 from ~49.8% to ~62.8%), a substantial ~13-point gain indicating that aggregating multiple profiles adds significant signal beyond a single profile and is a high-leverage axis of improvement, far exceeding the ~3.5-point encoder-quality gain observed earlier. It remains uncertain whether more complex aggregation strategies (e.g., transformer) could push beyond ~65%, whether this gain compounds with cross-modal fusion or alternative encoders, and whether the previously weak image modality might contribute more in a multiprofile context.\n\nExperiment ID: llm_summary_005\nModel setting: rna_only\nProfile setting: multiprofile\nRNA encoder: scvi_n200\nImage encoder: None\nAggregation: transformer\nFusion: None\nValidation accuracy: 0.652970\nValidation F1: 0.628258\nExperiment summary: This experiment isolated the aggregation architecture by replacing avgpool with a transformer in the otherwise identical RNA-only, multiprofile, scvi_n200 configuration (directly comparable to llm_summary_004). Validation accuracy of ~65.3% (F1 ~62.8%) is essentially unchanged from the avgpool result of ~65.0% (F1 ~62.8%), a negligible ~0.3-point difference suggesting that transformer aggregation does not substantially outperform simple average pooling and that ~65% may represent a practical ceiling for RNA-only multiprofile models under this encoder. It remains uncertain whether alternative encoders, the previously weak image modality in a multiprofile context, or cross-modal fusion could push beyond this level, and whether the near-equivalence of aggregation strategies would hold under different data scales or architectural combinations.\n\nExperiment ID: llm_summary_006\nModel setting: image_only\nProfile setting: multiprofile\nRNA encoder: None\nImage encoder: resnet50\nAggregation: avgpool\nFusion: None\nValidation accuracy: 0.327506\nValidation F1: 0.288442\nExperiment summary: This experiment tested whether multiprofile avgpool aggregation could recover meaningful signal from the image modality, directly paralleling the RNA multiprofile experiment (llm_summary_004). Validation accuracy of ~32.8% (F1 ~28.8%) represents a ~12-point improvement over the image-only single-profile baseline (~20.8%, llm_summary_002), confirming that the single-profile limitation was a contributing factor to the image modality's apparent weakness, yet the image modality remains substantially weaker than the RNA-only multiprofile baseline (~65.0%). This suggests the image modality carries considerably less independent predictive signal than RNA even after multiprofile aggregation, though it remains uncertain whether alternative image encoders, more complex aggregation, or multimodal fusion could extract additional value from the residual image signal, and whether ~32.8% is near the practical ceiling for image-only multiprofile models.\n\nExperiment ID: llm_summary_007\nModel setting: multimodal\nProfile setting: multiprofile\nRNA encoder: scvi_n200\nImage encoder: resnet50\nAggregation: avgpool\nFusion: concat\nValidation accuracy: 0.631518\nValidation F1: 0.606803\nExperiment summary: This experiment tested whether adding the image modality (ResNet50, avgpool) via simple concat fusion to the strongest RNA-only multiprofile backbone (scvi_n200, avgpool) would push beyond the ~65% RNA-only ceiling. The validation accuracy of ~63.2% (F1 ~60.7%) is slightly below the RNA-only multiprofile avgpool baseline (~65.0%), an initial observation suggesting that the residual image signal does not provide complementary predictive information under this configuration and may introduce mild interference, though the ~1.8-point gap is small and the specific contributor (image content, ResNet50 encoder quality, or the concat mechanism) cannot be isolated from this single experiment. It remains uncertain whether alternative fusion strategies (e.g., weighted or attention-based), stronger image encoders, or different image-branch aggregation could recover or exceed the RNA-only performance, or whether the image modality is fundamentally non-complementary for this task.\n\nReturn JSON only in exactly this format:\n{\n  \"summary\": \"Concise scientific summary.\"\n}",
+        "role": "user"
+      }
+    ],
+    "min_p": 0.0,
+    "model": "qwen3.8-27b",
+    "n": 1,
+    "presence_penalty": 0.0,
+    "reasoning_effort": "medium",
+    "repetition_penalty": 1.0,
+    "seed": 4294664711,
+    "stream": false,
+    "temperature": 0.6,
+    "top_k": 20,
+    "top_p": 0.95
+  },
+  "request_seed": 4294664711,
+  "response": {
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "annotations": null,
+          "audio": null,
+          "content": "\n\n{\n  \"summary\": \"This experiment isolated the fusion mechanism by replacing concat with weighted fusion in the otherwise identical multimodal, multiprofile configuration (scvi_n200 + ResNet50, avgpool), directly comparable to llm_summary_007. Validation accuracy rose from ~63.2% to ~67.8% (F1 from ~60.7% to ~64.6%), a ~4.6-point gain attributable to the fusion change, and now exceeds the RNA-only multiprofile avgpool baseline (~65.0%, llm_summary_004) by ~2.8 points, indicating that the image modality does carry complementary signal that concat fails to exploit and that weighted fusion effectively down-weights the weaker image contribution. It remains uncertain whether attention-based or learned fusion could push further beyond ~67.8%, whether stronger image encoders or image-specific aggregation could amplify the residual image contribution, and whether this gain is stable across different data splits or task formulations.\"\n}",
+          "function_call": null,
+          "reasoning": "Let me analyze the experiment results to write a proper summary.\n\nCurrent experiment (llm_summary_008):\n- Multimodal, multiprofile\n- RNA encoder: scvi_n200\n- Image encoder: resnet50\n- Aggregation: avgpool\n- Fusion: weighted\n- Validation accuracy: 0.677616 (~67.8%)\n- Validation F1: 0.646409 (~64.6%)\n\nKey comparison: This is directly comparable to llm_summary_007 (config_030), which used the exact same settings but with concat fusion instead of weighted fusion. The only difference is fusion: concat \u2192 weighted.\n\n- llm_summary_007 (concat): accuracy ~63.2%, F1 ~60.7%\n- llm_summary_008 (weighted): accuracy ~67.8%, F1 ~64.6%\n\nThis is a ~4.6-point improvement in accuracy and ~3.9-point improvement in F1 from switching concat to weighted fusion.\n\nAlso compare to RNA-only baseline (llm_summary_004): accuracy ~65.0%, F1 ~62.8%\n\nSo weighted fusion multimodal (~67.8%) now exceeds the RNA-only multiprofile baseline (~65.0%) by about 2.8 points.\n\nThis is a single-variable comparison (only fusion changed from concat to weighted), so we CAN say the fusion strategy change accounts for the difference. The reason selected explicitly states this is a single-variable comparison isolating the fusion strategy.\n\nWhat was tested: Weighted fusion replacing concat fusion in the multimodal multiprofile setup (scvi_n200 + ResNet50, avgpool).\n\nWhat the validation result suggests: Weighted fusion substantially outperforms concat fusion (~67.8% vs ~63.2%), a ~4.6-point gain, and now exceeds the RNA-only multiprofile baseline (~65.0%). This indicates the image modality does carry complementary signal that concat fails to exploit, and weighted fusion is better at down-weighting the weaker image contribution.\n\nWhat remains uncertain: Whether even stronger image encoders or different aggregation for the image branch could push further, whether attention-based fusion could do better than weighted, whether the ~67.8% is near the ceiling, and whether the improvement is robust.\n\nLet me write a 2-4 sentence summary.\n",
+          "refusal": null,
+          "role": "assistant"
+        },
+        "routed_experts": null,
+        "stop_reason": null,
+        "token_ids": null,
+        "weight_versions": null
+      }
+    ],
+    "created": 1793874892,
+    "ec_transfer_params": null,
+    "id": "chatcmpl-813a003eb0bc794f",
+    "kv_transfer_params": null,
+    "metrics": null,
+    "model": "qwen3.8-27b",
+    "object": "chat.completion",
+    "prompt_logprobs": null,
+    "prompt_text": null,
+    "prompt_token_ids": null,
+    "service_tier": null,
+    "system_fingerprint": "vllm-0.33.0-47c3dac8",
+    "usage": {
+      "completion_tokens": 750,
+      "completion_tokens_details": {
+        "reasoning_tokens": 531
+      },
+      "prompt_tokens": 2387,
+      "prompt_tokens_details": null,
+      "total_tokens": 3137
+    }
+  },
+  "response_sha256": "93ae68aa4de47a06cc2d57b5b62bcd5a1c0fee5b31a65ac42e08b18c9d2ec9f3",
+  "started_at": 1793874892.5109003,
+  "status": "accepted",
+  "trial": 8
+}

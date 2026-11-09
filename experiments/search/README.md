@@ -1,5 +1,164 @@
 # Autonomous Search Experiments
 
+## Local LLM experiments
+
+See [LLM_EXPERIMENTS.md](LLM_EXPERIMENTS.md) for the fresh Qwen replication protocol, existing-server
+connection/test/replay commands, controlled reasoning ablations, smoke prerequisites,
+safe partial-trajectory resumption and offline comparisons. New local runs opt in
+with `--llm-api chat`; original Responses clients and prompts are unchanged.
+Settings-derived model subdirectories preserve archived runs and completed classical results.
+The [final audit](LLM_AUDIT.md) records the saved smoke evidence and verification
+procedure. The current readable-directory smokes can extend to production under
+their unchanged execution protocol. Use `replay_with_report.py` with the same
+arguments for automatic offline summaries; reporting needs no new condition.
+The original `replay_search.py` execution path remains fully fingerprinted. LLM directory
+names show settings; full fingerprints and collision protection remain in metadata.
+Only the standard model-listing and Chat endpoints are required; extra server
+provenance is opportunistic and explicitly labelled by verification status.
+
+## Extended classical lookup comparison
+
+`replay_search.py` remains the entry point. CLI defaults are unchanged: methods
+`random bayesian`, 100 replicates, budget 10, full feedback and 3 startup trials.
+The classical extension adds `--seed` (base seed, default 1000). These runs
+look up completed measurements; they do not train models or call LLMs.
+
+| Method | Selection policy |
+| --- | --- |
+| `random` | Original uniform configuration sampler, unchanged |
+| `stratified_random` | Shuffled rounds with one uniform draw per nonempty family |
+| `multimodal_random` | Uniform without replacement among 36 multimodal configurations |
+| `bayesian` | Original hierarchical TPE, unchanged, including its historical rejection behaviour |
+| `tpe_repaired_hierarchical` | Original parameterisation/prior; corrected startup and rejection |
+| `tpe_repaired_uniform` | Same repair, with uniform startup over all 51 configurations |
+| `tpe_discrete` | Multivariate categorical TPE densities, scored over every valid remaining candidate |
+| `gp_ei` | Categorical one-hot Matérn GP and expected improvement |
+| `rf_ei` | Bootstrap RF with tree dispersion and Gaussian approximate EI |
+| `multimodal_diverse` | Random first multimodal pick, then maximum minimum structural distance |
+
+The multimodal-only methods support budgets 1–36; the others support 1–51.
+The original TPE can still exhaust its proposal limit; it is deliberately preserved.
+Use [METHODS.md](METHODS.md) for the exact algorithms and interpretation.
+
+Commands below are for the user to run from the repository root in the existing
+Poetry environment. Dependencies must match `poetry.lock`; finite TPE explicitly
+requires Optuna 4.9.0. No dependency installation is performed by these scripts.
+
+Run the synthetic unit tests first (no measured-landscape search or API calls):
+
+```bash
+poetry run pytest experiments/search/tests/test_search_baselines.py
+```
+
+Small lookup smoke run: all ten methods, two replicates, five evaluations (including
+two adaptive choices after three startup evaluations):
+
+```bash
+poetry run python experiments/search/replay_search.py \
+  --methods random stratified_random multimodal_random bayesian \
+    tpe_repaired_hierarchical tpe_repaired_uniform tpe_discrete \
+    gp_ei rf_ei multimodal_diverse \
+  --replicates 2 --budget 5 --startup-trials 3 --landscape full --seed 1000
+```
+
+Full comparison:
+
+```bash
+poetry run python experiments/search/replay_search.py \
+  --methods random stratified_random multimodal_random bayesian \
+    tpe_repaired_hierarchical tpe_repaired_uniform tpe_discrete \
+    gp_ei rf_ei multimodal_diverse \
+  --replicates 1000 --budget 10 --startup-trials 3 --landscape full --seed 1000
+```
+
+Repeat that command to resume. For prespecified startup sensitivities, run the
+Bayesian methods with `--startup-trials 1` and `--startup-trials 5` separately.
+Use a different base seed for another batch; overlapping seed ranges are not
+independent replicates. There is no automatic sweep launcher.
+
+New classical files, including new runs of `random` and `bayesian`, go to:
+
+```text
+results/lookup_replays/baselines/full/
+  budget_010_startup_003_seed_1000_p<protocol-hash>/
+    metadata.json
+    <method>.csv
+analysis/lookup_replay/baselines/full/
+  budget_010_startup_003_seed_1000_p<protocol-hash>/
+    replay_trials_scored.csv
+    analysis_metadata.json
+    replay_curves.csv
+    replay_compute_curves.csv
+    replay_random_analytical.csv
+    replay_selection_mix.csv
+    replay_tpe_diagnostics.csv
+    replay_best_validation.png
+    replay_compute.png
+```
+
+There is no `--run-name`. Settings, selection source hashes, feedback-file hash,
+Python version and numerical package versions identify the output condition.
+Replicate count and method subset do not change the path. Plotting-only changes
+do not change the selection fingerprint. Metadata records the full fingerprint.
+
+Each completed replicate is saved atomically. An identical invocation reuses it;
+larger replicate counts append missing IDs and smaller counts restrict analysis
+without deleting saved rows. An interruption within a replicate restarts that
+replicate. Malformed or incompatible existing data causes an error, not deletion.
+A nonblocking directory lock prevents concurrent writers to the same condition.
+Metadata writes interrupted before completion fail closed and require inspection.
+Derived reports are regenerated for the selected methods and replicate limit;
+their metadata records input hashes, analysis source hash and CI settings. Raw
+trajectories are preserved when regenerating or narrowing an analysis.
+
+Historical root CSVs and `models/<model>/` outputs are not adopted or overwritten
+by classical runs. Proprietary Responses generation retains its existing paths,
+prompts and historical resume logic. Changing its generation budget/token setting
+in an existing results location still requires care. New local Chat runs use the
+separate smoke-gated saving protocol documented in [LLM_EXPERIMENTS.md](LLM_EXPERIMENTS.md).
+
+For the recent `qwen3-8b-thinking` runs, use the
+[consolidated offline command](LLM_EXPERIMENTS.md#offline-analysis). It reads the
+completed classical CSVs directly and combines all ten methods at 1,000
+replicates each with the two Qwen prompts at their saved counts (currently 50
+each), plus the explicitly selected GPT-6 Astra and Opus 5.5 archives (seven
+prompting conditions per model, ten trajectories each). Historical rows retain
+their model/prompt labels and are marked as saved completed samples with
+unrecorded execution settings and unavailable failure/inference accounting.
+No baseline experiments, inference or earlier analysis reports need to be
+rerun. Use `--replicates 1000` for this comparison: the limit applies to every
+input, so 50 would also truncate the classical sample. The report prints and
+saves input coverage and keeps each full LLM protocol separate. All source
+results remain read-only.
+The command uses the reporting-only `PATH::llm_metrics` input filter to add the
+completed Qwen3.8-27B xhigh metrics arm without also adding its one-replicate or
+partial prompt-variant states.
+
+The older per-model comparison against historical proprietary LLM trajectories
+also remains available with `--analyze-only`; no API call is made:
+
+```bash
+poetry run python experiments/search/replay_search.py --analyze-only \
+  --methods random stratified_random multimodal_random bayesian \
+    tpe_repaired_hierarchical tpe_repaired_uniform tpe_discrete \
+    gp_ei rf_ei multimodal_diverse llm_metrics llm_summary \
+  --llm-model openai_gpt6_astra \
+  --replicates 1000 --budget 10 --startup-trials 3 --landscape full --seed 1000
+```
+
+Repeat with the other model names to generate separate comparison directories.
+Actual LLM replicate counts are retained. The analysis writes under the matching
+baseline condition's `comparisons/<model>/` directory, preserving historical
+model-comparison outputs. Different implementation fingerprints are analysed
+separately, never pooled. A default analysis with only historical inputs still
+works, writing under `analysis/lookup_replay/baselines/legacy/` and identifying
+the missing historical provenance.
+
+The implementation is split into selectors (`classical_search.py`), a private
+Optuna adapter (`tpe_acquisition.py`), saving (`baseline_io.py`) and offline
+analysis (`baseline_analysis.py`). The latter two helpers keep the entry point
+small; they are not additional CLIs. Matched-start LLM integration is deferred.
+
 This folder contains the search experiments I am using to explore the scGeneScope model space.
 
 The main goal is to compare different ways of choosing which model configuration to try next. I am comparing random search, Bayesian optimization, and two LLM-guided search strategies under the same experiment budget.

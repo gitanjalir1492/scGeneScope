@@ -1,0 +1,250 @@
+{
+  "api": "chat/completions",
+  "base_seed": 2000,
+  "budget": 10,
+  "condition": null,
+  "feedback_decimals": 6,
+  "generation": {
+    "context_window": null,
+    "decoding_profile": "controlled",
+    "family": "qwen38",
+    "frequency_penalty": 0.0,
+    "max_tokens": 16384,
+    "min_p": 0.0,
+    "model": "qwen3.8-27b",
+    "model_id": "Qwen/Qwen3.8-27B",
+    "presence_penalty": 0.0,
+    "reasoning_effort": "medium",
+    "repetition_penalty": 1.0,
+    "revision": null,
+    "selection_attempts": 3,
+    "temperature": 0.6,
+    "thinking": "on",
+    "timeout_seconds": 900,
+    "top_k": 20,
+    "top_p": 0.95,
+    "transport_attempts_per_invocation": 3
+  },
+  "historical_reuse": false,
+  "initial_prompt_sha256": {
+    "llm_metrics": "17c41fc34f251ea2422c0104d999bd0138076f84b80f88adcce515f70e348033",
+    "llm_metrics_budget": "b28af30f974a9a045e20611b564a649d1a31ffbafb7e7905891529a8228086af",
+    "llm_metrics_combined": "e30703be5afac402cefcb3dd077abf6d5f4ebaea27140a50b788023bc882d15e",
+    "llm_metrics_combined_gpu": "f96fd4ca36f317a948dab8de7ca64fbb7f76872f449dcd1117fea6a40956a211",
+    "llm_metrics_no_isolation": "6df7de95b0dcc717d527a13c127ebda272b8c74955a847c0af85d50877cc539f",
+    "llm_metrics_shuffled": "0dbbde86021afad3bc5177de2fe874c112caedc5bb275f65bcbde8f722fcf7ce",
+    "llm_summary": "17c41fc34f251ea2422c0104d999bd0138076f84b80f88adcce515f70e348033"
+  },
+  "landscape": "full",
+  "landscape_sha256": "d2977505b24cea89180fd8198867d62c4728d2c0288544f0f8266a530e2f0289",
+  "model": "qwen3.8-27b",
+  "other_comparators": [
+    "tpe_discrete",
+    "gp_ei",
+    "multimodal_diverse"
+  ],
+  "primary_metric": "optimum_discovery_at_budget",
+  "principal_comparator": "rf_ei",
+  "prompt_hash_definition": "SHA256 of compact JSON-encoded prompt string; every actual prompt hash is also saved in its request journal",
+  "prompt_source_hashes": {
+    "llm_search.py": "1ff8aea1949cff85b2aa3e0fca6afca1418dc6ae03e71b82280b0c7c79c85167",
+    "search_space.py": "34fc5b90eace32d8c9651029088cf763e6698c14b038fc5ef4c5f0a05fd169a4",
+    "summarize_experiment.py": "d2159e9cd03af0c33b08404efa4cd54b193d6ad1c6469eb117b2c9be4cad0706"
+  },
+  "protocol": "local-chat-replay",
+  "protocol_hash": "ee10983caaa8a9c3da9086ab092ea6d7431c1da839c9cb8c642fbc2f2cbd73bc",
+  "python": "3.11.18",
+  "replicate_seed_scheme": "base_seed + zero_based_replicate; catalogue shuffling only",
+  "reproducibility_limitations": [
+    "API acceptance does not verify internal seed, sampling or reasoning-control application.",
+    "Unreported checkpoint revisions and server settings cannot be compared across restarts.",
+    "Journal recovery is deterministic reuse; distinct seeded requests do not guarantee independent or bitwise-reproducible server sampling.",
+    "revision: unavailable",
+    "effective_sampling: unavailable",
+    "reasoning_control_rendered: unavailable",
+    "Seed and sampling application inside the server are unverified; exact requests will be logged without claiming deterministic inference.",
+    "Requested reasoning effort is not independently verified; response length is not evidence that effort was applied."
+  ],
+  "sampling_interpretation": "distinct request seeds for stochastic trajectories; journal recovery reuses exact responses; server determinism and independence are not verified",
+  "schema_version": 3,
+  "seed_scheme": "sha256(JSON [llm-replay-request-v1, base_seed, method[:summary], replicate, trial, attempt])[:8]; uint32; collisions refused before generation",
+  "server": {
+    "control_probe": {
+      "count": null,
+      "sampling": null,
+      "text": null,
+      "token_sha256": null
+    },
+    "endpoint": "http://127.0.0.1:8000/v1",
+    "model": {
+      "max_model_len": 65536
+    },
+    "provenance": {
+      "chat_template_sha256": {
+        "source": "GET /tokenizer_info",
+        "status": "unavailable",
+        "value": null
+      },
+      "context_window": {
+        "source": "server model metadata",
+        "status": "verified",
+        "value": 65536
+      },
+      "effective_sampling": {
+        "source": "Chat render endpoint",
+        "status": "unavailable",
+        "value": null
+      },
+      "endpoint": {
+        "source": "OPENAI_BASE_URL",
+        "status": "user_supplied",
+        "value": "http://127.0.0.1:8000/v1"
+      },
+      "engine": {
+        "source": "GET /server_info; selected non-credential fields",
+        "status": "unavailable",
+        "value": null
+      },
+      "hardware": {
+        "source": "GET /server_info",
+        "status": "unavailable",
+        "value": null
+      },
+      "inference_gpu_count": {
+        "source": "server tensor_parallel_size * pipeline_parallel_size",
+        "status": "unavailable",
+        "value": null
+      },
+      "model_id": {
+        "source": "server model metadata",
+        "status": "verified",
+        "value": "Qwen/Qwen3.8-27B"
+      },
+      "reasoning_control_rendered": {
+        "source": "Chat render contrast (not a guarantee of model behaviour)",
+        "status": "unavailable",
+        "value": null
+      },
+      "reported_revision": {
+        "source": "server revision field (may be mutable)",
+        "status": "unavailable",
+        "value": null
+      },
+      "request_fields_declared": {
+        "source": "GET /openapi.json Chat request schema",
+        "status": "verified",
+        "value": {
+          "chat_template_kwargs": true,
+          "frequency_penalty": true,
+          "max_tokens": true,
+          "min_p": true,
+          "n": true,
+          "presence_penalty": true,
+          "reasoning_effort": true,
+          "repetition_penalty": true,
+          "seed": true,
+          "temperature": true,
+          "top_k": true,
+          "top_p": true
+        }
+      },
+      "revision": {
+        "source": null,
+        "status": "unavailable",
+        "value": null
+      },
+      "served_model": {
+        "source": "GET /v1/models",
+        "status": "verified",
+        "value": "qwen3.8-27b"
+      },
+      "server_version": {
+        "source": "GET /version",
+        "status": "verified",
+        "value": "0.33.0"
+      },
+      "system_start_date": {
+        "source": "GET /server_info",
+        "status": "unavailable",
+        "value": null
+      },
+      "tokenizer_class": {
+        "source": "GET /tokenizer_info",
+        "status": "unavailable",
+        "value": null
+      }
+    },
+    "render_available": false,
+    "warnings": [
+      "revision: unavailable",
+      "effective_sampling: unavailable",
+      "reasoning_control_rendered: unavailable",
+      "Seed and sampling application inside the server are unverified; exact requests will be logged without claiming deterministic inference.",
+      "Requested reasoning effort is not independently verified; response length is not evidence that effort was applied."
+    ]
+  },
+  "source_hashes": {
+    "base_row": "e05b04ecfa52f65c27a4eb39f887e04c6daeb8536851b163c749b0109f2f090c",
+    "classical_search.py": "2418f41fb3b90f8959a316ebd9b1e4497cb6da52c1102946731a093b4a5a78a3",
+    "complete": "2f9be5085b427cca1bbfa08122c9fe4fad6a37e0c997ea13061d25c524543e5d",
+    "llm_client.py": "88d9741d3c3e8dd4befb7fdd93bbd6fe4bfeab264681dbf92062dd66bcde1996",
+    "llm_replay_io.py": "8e581a87fe8e9ed8693f25af3eb19a9b607146ab7d9543ff56fd50c06ae2c4ba",
+    "llm_search.py": "1ff8aea1949cff85b2aa3e0fca6afca1418dc6ae03e71b82280b0c7c79c85167",
+    "replay_search.py": "ffe041f1e7ac3f8231f75a13d3259636d55ec95f6f0bcaa82c9de09aa37714df",
+    "results_io.py": "5a1c654def5eae290e28e9f2b128d8da92d7a0f6adea5a890957a9b16d5c2395",
+    "search_space.py": "34fc5b90eace32d8c9651029088cf763e6698c14b038fc5ef4c5f0a05fd169a4",
+    "summarize_experiment.py": "d2159e9cd03af0c33b08404efa4cd54b193d6ad1c6469eb117b2c9be4cad0706"
+  },
+  "supporting_metric": "mean_best_val_accuracy",
+  "variants": {
+    "llm_metrics": {
+      "budget": false,
+      "gpu": false,
+      "isolation": true,
+      "mode": "metrics",
+      "shuffle": false
+    },
+    "llm_metrics_budget": {
+      "budget": true,
+      "gpu": false,
+      "isolation": true,
+      "mode": "metrics",
+      "shuffle": false
+    },
+    "llm_metrics_combined": {
+      "budget": true,
+      "gpu": false,
+      "isolation": false,
+      "mode": "metrics",
+      "shuffle": true
+    },
+    "llm_metrics_combined_gpu": {
+      "budget": true,
+      "gpu": true,
+      "isolation": false,
+      "mode": "metrics",
+      "shuffle": true
+    },
+    "llm_metrics_no_isolation": {
+      "budget": false,
+      "gpu": false,
+      "isolation": false,
+      "mode": "metrics",
+      "shuffle": false
+    },
+    "llm_metrics_shuffled": {
+      "budget": false,
+      "gpu": false,
+      "isolation": true,
+      "mode": "metrics",
+      "shuffle": true
+    },
+    "llm_summary": {
+      "budget": false,
+      "gpu": false,
+      "isolation": true,
+      "mode": "summary",
+      "shuffle": false
+    }
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "interruptions": [
+    {
+      "error": "",
+      "error_type": "KeyboardInterrupt",
+      "time": 1793872671.6280897
+    }
+  ],
+  "method": "llm_metrics_budget",
+  "protocol_hash": "8fcc70008d2db0bb184a02ffd5d50bd9833fb93649c3080780d862506caa11ee",
+  "replicate": 1,
+  "rows": [
+    {
+      "aggregation": "",
+      "experiment": "rnaseq/singleprofile/train_on_pca_n2000",
+      "experiment_id": "llm_metrics_budget_001",
+      "experiment_summary": "",
+      "fusion": "",
+      "image_encoder": "",
+      "model_setting": "rna_only",
+      "profile_setting": "singleprofile",
+      "rna_encoder": "pca_n2000",
+      "runtime_hours": "0.0410",
+      "search_method": "llm_metrics",
+      "selection_reason": "No experiments have been completed, so the main uncertainty is the performance scale and whether a simple RNA-only baseline is already competitive. This experiment tests the minimal RNA-only, single-profile, PCA-based model as an anchor. It is the best next step because it avoids confounding multiple design choices and provides a reference for later isolating the effects of image modality, multiprofile aggregation, learned RNA encoders, and multimodal fusion.",
+      "status": "completed",
+      "val_accuracy": "0.484925",
+      "val_f1": "0.463917"
+    },
+    {
+      "aggregation": "",
+      "experiment": "imaging/singleprofile/train_on_concat_resnet50",
+      "experiment_id": "llm_metrics_budget_002",
+      "experiment_summary": "",
+      "fusion": "",
+      "image_encoder": "resnet50",
+      "model_setting": "image_only",
+      "profile_setting": "singleprofile",
+      "rna_encoder": "",
+      "runtime_hours": "0.1260",
+      "search_method": "llm_metrics",
+      "selection_reason": "The only completed experiment is a single-profile RNA PCA baseline with modest accuracy (0.485), so it is still unclear whether image features are informative for this task. Testing image_only with ResNet50 and singleprofile isolates the value of the image modality before committing budget to multimodal fusion. This baseline will clarify whether image features are competitive with or complementary to RNA, making it a high-value uncertainty-reducing experiment.",
+      "status": "completed",
+      "val_accuracy": "0.207893",
+      "val_f1": "0.171760"
+    },
+    {
+      "aggregation": "avgpool",
+      "experiment": "rnaseq/multiprofile/train_avgpool_on_pca_n2000",
+      "experiment_id": "llm_metrics_budget_003",
+      "experiment_summary": "",
+      "fusion": "",
+      "image_encoder": "",
+      "model_setting": "rna_only",
+      "profile_setting": "multiprofile",
+      "rna_encoder": "pca_n2000",
+      "runtime_hours": "1.3390",
+      "search_method": "llm_metrics",
+      "selection_reason": "RNA-only PCA singleprofile is much stronger than image-only ResNet (0.485 vs 0.208 accuracy, with higher F1), so the RNA branch is the most promising direction. Multiprofile RNA with simple avgpool aggregation is untested and directly extends the best RNA baseline while changing only the profile/aggregation setting. This tests whether multiple profiles can improve the leading RNA representation before trying more complex aggregation or fusion, making it an efficient exploitation step with 7 experiments remaining.",
+      "status": "completed",
+      "val_accuracy": "0.590664",
+      "val_f1": "0.572658"
+    },
+    {
+      "aggregation": "transformer",
+      "experiment": "rnaseq/multiprofile/train_transformerpool_on_pca_n2000",
+      "experiment_id": "llm_metrics_budget_004",
+      "experiment_summary": "",
+      "fusion": "",
+      "image_encoder": "",
+      "model_setting": "rna_only",
+      "profile_setting": "multiprofile",
+      "rna_encoder": "pca_n2000",
+      "runtime_hours": "0.9880",
+      "search_method": "llm_metrics",
+      "selection_reason": "The strongest evidence so far is RNA PCA multiprofile with avgpool (accuracy 0.591, F1 0.573), which clearly outperforms singleprofile RNA and image-only baselines. The key uncertainty is whether transformer aggregation can improve over avgpool for multiprofile RNA. config_003 changes only aggregation relative to the current best, isolating that effect and informing whether transformer aggregation should be used in later multimodal experiments. This is a focused exploitation step that preserves budget for encoder and fusion exploration.",
+      "status": "completed",
+      "val_accuracy": "0.519086",
+      "val_f1": "0.479691"
+    },
+    {
+      "aggregation": "avgpool",
+      "experiment": "rnaseq/multiprofile/train_avgpool_on_scgpt",
+      "experiment_id": "llm_metrics_budget_005",
+      "experiment_summary": "",
+      "fusion": "",
+      "image_encoder": "",
+      "model_setting": "rna_only",
+      "profile_setting": "multiprofile",
+      "rna_encoder": "scgpt",
+      "runtime_hours": "0.4340",
+      "search_method": "llm_metrics",
+      "selection_reason": "The strongest evidence so far is RNA-only multiprofile with PCA and avgpool, which achieved the best accuracy (0.5907) and F1 (0.5727), while single-profile PCA and transformer aggregation were weaker and image-only ResNet was poor. This experiment tests whether replacing PCA with the scgpt RNA encoder improves that same promising multiprofile avgpool setting, cleanly isolating the effect of RNA representation. It is the best next step because it exploits the current best direction with a focused comparison and will clarify whether stronger RNA encoders or multimodal fusion should be prioritized in the remaining budget.",
+      "status": "completed",
+      "val_accuracy": "0.530464",
+      "val_f1": "0.515210"
+    }
+  ],
+  "seed": 2001,
+  "state_sha256": "b6076a875c057cbfd4ea8ab07da07f986e1977b94f2470bb2db88964d8e9ec65",
+  "status": "in_progress"
+}

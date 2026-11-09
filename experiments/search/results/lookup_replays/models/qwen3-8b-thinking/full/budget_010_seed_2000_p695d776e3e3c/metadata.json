@@ -1,0 +1,217 @@
+{
+  "api": "chat/completions",
+  "base_seed": 2000,
+  "budget": 10,
+  "feedback_decimals": 6,
+  "generation": {
+    "context_window": null,
+    "decoding_profile": "controlled",
+    "family": "qwen3",
+    "frequency_penalty": 0.0,
+    "max_tokens": 8192,
+    "min_p": 0.0,
+    "model": "qwen3-8b-thinking",
+    "model_id": "Qwen/Qwen3-8B",
+    "presence_penalty": 0.0,
+    "reasoning_effort": null,
+    "repetition_penalty": 1.0,
+    "revision": null,
+    "selection_attempts": 3,
+    "temperature": 0.6,
+    "thinking": "on",
+    "timeout_seconds": 900,
+    "top_k": 20,
+    "top_p": 0.95,
+    "transport_attempts_per_invocation": 3
+  },
+  "historical_reuse": false,
+  "landscape": "full",
+  "landscape_sha256": "d2977505b24cea89180fd8198867d62c4728d2c0288544f0f8266a530e2f0289",
+  "model": "qwen3-8b-thinking",
+  "other_comparators": [
+    "tpe_discrete",
+    "multimodal_diverse"
+  ],
+  "primary_metric": "optimum_discovery_at_budget",
+  "principal_comparator": "rf_ei",
+  "protocol": "batch2-local-chat",
+  "protocol_hash": "695d776e3e3c43abfbe811bb3c32cf35b737d71c62c40249db945335e1e6d0b0",
+  "python": "3.11.18",
+  "schema_version": 2,
+  "seed_scheme": "sha256(batch2-request-v1, base_seed, method[:summary], replicate, trial, attempt)[:8]",
+  "server": {
+    "control_probe": {
+      "count": null,
+      "sampling": null,
+      "text": null,
+      "token_sha256": null
+    },
+    "endpoint": "http://127.0.0.1:8000/v1",
+    "model": {
+      "max_model_len": 16384
+    },
+    "provenance": {
+      "chat_template_sha256": {
+        "source": "GET /tokenizer_info",
+        "status": "unavailable",
+        "value": null
+      },
+      "context_window": {
+        "source": "server model metadata",
+        "status": "verified",
+        "value": 16384
+      },
+      "effective_sampling": {
+        "source": "Chat render endpoint",
+        "status": "unavailable",
+        "value": null
+      },
+      "endpoint": {
+        "source": "OPENAI_BASE_URL",
+        "status": "user_supplied",
+        "value": "http://127.0.0.1:8000/v1"
+      },
+      "engine": {
+        "source": "GET /server_info; selected non-credential fields",
+        "status": "unavailable",
+        "value": null
+      },
+      "hardware": {
+        "source": "GET /server_info",
+        "status": "unavailable",
+        "value": null
+      },
+      "inference_gpu_count": {
+        "source": "server tensor_parallel_size * pipeline_parallel_size",
+        "status": "unavailable",
+        "value": null
+      },
+      "model_id": {
+        "source": "server model metadata",
+        "status": "verified",
+        "value": "Qwen/Qwen3-8B"
+      },
+      "reasoning_control_rendered": {
+        "source": "Chat render contrast (not a guarantee of model behaviour)",
+        "status": "unavailable",
+        "value": null
+      },
+      "reported_revision": {
+        "source": "server revision field (may be mutable)",
+        "status": "unavailable",
+        "value": null
+      },
+      "request_fields_declared": {
+        "source": "GET /openapi.json Chat request schema",
+        "status": "verified",
+        "value": {
+          "chat_template_kwargs": true,
+          "frequency_penalty": true,
+          "max_tokens": true,
+          "min_p": true,
+          "n": true,
+          "presence_penalty": true,
+          "repetition_penalty": true,
+          "seed": true,
+          "temperature": true,
+          "top_k": true,
+          "top_p": true
+        }
+      },
+      "revision": {
+        "source": null,
+        "status": "unavailable",
+        "value": null
+      },
+      "served_model": {
+        "source": "GET /v1/models",
+        "status": "verified",
+        "value": "qwen3-8b-thinking"
+      },
+      "server_version": {
+        "source": "GET /version",
+        "status": "verified",
+        "value": "0.33.0"
+      },
+      "system_start_date": {
+        "source": "GET /server_info",
+        "status": "unavailable",
+        "value": null
+      },
+      "tokenizer_class": {
+        "source": "GET /tokenizer_info",
+        "status": "unavailable",
+        "value": null
+      }
+    },
+    "render_available": false,
+    "warnings": [
+      "revision: unavailable",
+      "effective_sampling: unavailable",
+      "reasoning_control_rendered: unavailable",
+      "Seed and sampling application inside the server are unverified; exact requests will be logged without claiming deterministic inference."
+    ]
+  },
+  "source_hashes": {
+    "base_row": "e05b04ecfa52f65c27a4eb39f887e04c6daeb8536851b163c749b0109f2f090c",
+    "complete": "2f9be5085b427cca1bbfa08122c9fe4fad6a37e0c997ea13061d25c524543e5d",
+    "llm_client.py": "ae5b4379bc0537f385508a2733a2864cefa3bbe6e4d718b8ab56f356d2bac2dd",
+    "llm_replay_io.py": "72c0d992e7397241077b36ed334bdfe989cc5c175972a9bbfc32f1938a3b3710",
+    "llm_search.py": "1ff8aea1949cff85b2aa3e0fca6afca1418dc6ae03e71b82280b0c7c79c85167",
+    "results_io.py": "5a1c654def5eae290e28e9f2b128d8da92d7a0f6adea5a890957a9b16d5c2395",
+    "search_space.py": "34fc5b90eace32d8c9651029088cf763e6698c14b038fc5ef4c5f0a05fd169a4",
+    "summarize_experiment.py": "d2159e9cd03af0c33b08404efa4cd54b193d6ad1c6469eb117b2c9be4cad0706"
+  },
+  "supporting_metric": "mean_best_val_accuracy",
+  "variants": {
+    "llm_metrics": {
+      "budget": false,
+      "gpu": false,
+      "isolation": true,
+      "mode": "metrics",
+      "shuffle": false
+    },
+    "llm_metrics_budget": {
+      "budget": true,
+      "gpu": false,
+      "isolation": true,
+      "mode": "metrics",
+      "shuffle": false
+    },
+    "llm_metrics_combined": {
+      "budget": true,
+      "gpu": false,
+      "isolation": false,
+      "mode": "metrics",
+      "shuffle": true
+    },
+    "llm_metrics_combined_gpu": {
+      "budget": true,
+      "gpu": true,
+      "isolation": false,
+      "mode": "metrics",
+      "shuffle": true
+    },
+    "llm_metrics_no_isolation": {
+      "budget": false,
+      "gpu": false,
+      "isolation": false,
+      "mode": "metrics",
+      "shuffle": false
+    },
+    "llm_metrics_shuffled": {
+      "budget": false,
+      "gpu": false,
+      "isolation": true,
+      "mode": "metrics",
+      "shuffle": true
+    },
+    "llm_summary": {
+      "budget": false,
+      "gpu": false,
+      "isolation": true,
+      "mode": "summary",
+      "shuffle": false
+    }
+  }
+}

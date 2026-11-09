@@ -1,8 +1,8 @@
 """Replay the search methods many times on the completed 51-configuration landscape (lookup instead of training).
 
 Each replicate starts from an empty history; when a method picks a configuration, its validation accuracy/F1 are
-looked up from a landscape results file instead of being trained. Methods reuse the selection code of the live
-search (random_search, bayesian_search, llm_search, summarize_experiment). LLM methods need OpenAI credentials.
+looked up from a landscape results file instead of being trained. Original live selectors are preserved alongside
+the additional classical baselines. LLM methods need OpenAI credentials.
 
     python replay_search.py --methods random bayesian --replicates 200
     python replay_search.py --methods llm_metrics llm_summary --replicates 5
@@ -14,8 +14,10 @@ analysis/lookup_replay/models/<model>/; analysis/lookup_replay/model_comparison.
 """
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
+import sys
 
 import matplotlib
 
@@ -27,6 +29,8 @@ import optuna
 import pandas as pd
 
 import bayesian_search
+import baseline_io
+import classical_search
 import llm_search
 import random_search
 import summarize_experiment
@@ -53,7 +57,7 @@ LLM_VARIANTS = {
     "llm_metrics_combined": dict(mode="metrics", shuffle=True, budget=True, isolation=False, gpu=False),
     "llm_metrics_combined_gpu": dict(mode="metrics", shuffle=True, budget=True, isolation=False, gpu=True),
 }
-METHOD_ORDER = ["random", "bayesian", *LLM_VARIANTS]
+METHOD_ORDER = [*classical_search.METHODS, *LLM_VARIANTS]
 COLOURS = {"random": "#7f7f7f", "bayesian": "#1f77b4", "llm_metrics": "#d62728", "llm_summary": "#2ca02c",
            "llm_metrics_shuffled": "#ff7f0e", "llm_metrics_budget": "#9467bd",
            "llm_metrics_no_isolation": "#8c564b", "llm_metrics_combined": "#e377c2",
@@ -68,9 +72,13 @@ def load_landscape(name: str) -> dict[str, dict]:
     if "runtime_hours" not in table:
         table["runtime_hours"] = np.nan
     expected = {build_experiment_name(config) for config in generate_all_configurations(runnable_only=True)}
-    missing = expected - set(table["experiment"])
-    if missing:
-        raise RuntimeError(f"{name} landscape is missing {len(missing)} configurations: {sorted(missing)[:3]}")
+    if len(expected) != 51 or len(table) != 51 or not table["experiment"].is_unique or set(table["experiment"]) != expected:
+        raise RuntimeError(f"{name} landscape must contain exactly the 51 unique completed configurations.")
+    for metric in ("val_accuracy", "val_f1"):
+        if not np.isfinite(table[metric]).all() or not table[metric].between(0, 1).all():
+            raise ValueError(f"Invalid landscape {metric}.")
+    if name == "full" and (not np.isfinite(table["runtime_hours"]).all() or (table["runtime_hours"] <= 0).any()):
+        raise ValueError("Full landscape requires finite positive training costs.")
     return table.set_index("experiment")[["val_accuracy", "val_f1", "runtime_hours"]].to_dict("index")
 
 
@@ -92,10 +100,10 @@ def complete(row: dict[str, str], landscape: dict[str, dict]) -> None:
                runtime_hours=f"{result['runtime_hours']:.4f}")
 
 
-def propose_random(rows, method, seed, budget, **_):
+def propose_random(rows, method, seed, budget, state, **_):
     if not rows:
-        propose_random.order = random_search.select_configurations(rows=[], number_to_select=budget, seed=seed)
-    return propose_random.order[len(rows)], "Random selection."
+        state["order"] = random_search.select_configurations(rows=[], number_to_select=budget, seed=seed)
+    return state["order"][len(rows)], "Random selection."
 
 
 def propose_bayesian(rows, method, seed, startup_trials, **_):
@@ -136,16 +144,36 @@ def summarise_llm(rows, row, log):
     raise RuntimeError(f"No valid summary after {MAX_LLM_ATTEMPTS} attempts")
 
 
-PROPOSERS = {"random": propose_random, "bayesian": propose_bayesian, **{name: propose_llm for name in LLM_VARIANTS}}
+def propose_classical(rows, method, seed, startup_trials, state, **_):
+    # Explicit allowlist at the optimiser boundary; no test, cost, summaries, or ranks.
+    visible = [{key: row[key] for key in (*classical_search.FIELDS, "status", "val_accuracy", "val_f1")}
+               for row in rows]
+    config, diagnostics = classical_search.suggest(visible, method, seed, startup_trials)
+    state["diagnostics"] = diagnostics
+    return config, f"{method}: {json.dumps(diagnostics, sort_keys=True)}"
 
 
-def replay(method, replicate, landscape, budget, startup_trials):
-    seed = 1000 + replicate
-    rows, log = [], []
+PROPOSERS = {"random": propose_random, "bayesian": propose_bayesian,
+             **{name: propose_classical for name in classical_search.METHODS if name not in {"random", "bayesian"}},
+             **{name: propose_llm for name in LLM_VARIANTS}}
+
+
+def replay(method, replicate, landscape, budget, startup_trials, base_seed=1000):
+    seed = base_seed + replicate
+    rows, log, state = [], [], {}
+    eligible = {classical_search.key(c) for c in classical_search.catalogue(method)}
+    if not 1 <= budget <= len(eligible):
+        raise ValueError(f"{method}: budget must be between 1 and {len(eligible)}.")
+    used = set()
     for number in range(1, budget + 1):
         config, reason = PROPOSERS[method](rows=rows, method=method, seed=seed, budget=budget,
-                                           startup_trials=startup_trials, log=log)
+                                           startup_trials=startup_trials, log=log, state=state)
+        config_key = classical_search.key(classical_search.configuration(config))
+        if config_key not in eligible or config_key in used:
+            raise ValueError("Proposer selected an invalid or repeated configuration.")
+        used.add(config_key)
         row = base_row(config, method, number, reason)
+        row.update(state.get("diagnostics", {}))
         complete(row, landscape)
         rows.append(row)
         if method == "llm_summary":
@@ -156,7 +184,8 @@ def replay(method, replicate, landscape, budget, startup_trials):
         (log_dir / f"replicate_{replicate:03d}.json").write_text(json.dumps(log, indent=1))
     return [{"method": method, "replicate": replicate, "seed": seed, "trial": index, "experiment": row["experiment"],
              "val_accuracy": float(row["val_accuracy"]), "val_f1": float(row["val_f1"]),
-             "selection_reason": row["selection_reason"], "experiment_summary": row["experiment_summary"]}
+             "selection_reason": row["selection_reason"], "experiment_summary": row["experiment_summary"],
+             **{name: row[name] for name in ("phase", "proposal_attempts", "fallback", "gp_jitter") if name in row}}
             for index, row in enumerate(rows, start=1)]
 
 
@@ -318,7 +347,45 @@ def plot_curves(curves, optimum, methods, path):
     plt.close(fig)
 
 
-def main():
+def baseline_settings(args):
+    return baseline_io.protocol(SEARCH_DIR, LANDSCAPES[args.landscape], args.landscape, args.budget,
+                                args.startup_trials, args.seed,
+                                functions=(replay, base_row, complete, propose_random, propose_bayesian, propose_classical))
+
+
+def analyze_baselines(args, directory, metadata):
+    import baseline_analysis
+
+    frames, sources = [], []
+    for method in args.methods:
+        path = directory / f"{method}.csv" if method in classical_search.METHODS else REPLAY_DIR / f"{method}.csv"
+        if not path.exists():
+            print(f"No matching saved results: {path}")
+            continue
+        table = baseline_io.validate_trials(pd.read_csv(path, keep_default_na=False), method, args.budget,
+                                           args.landscape, args.seed if method in classical_search.METHODS else None)
+        table = table.loc[table["replicate"].lt(args.replicates)].copy()
+        if table.empty:
+            continue
+        model = "classical" if method in classical_search.METHODS else args.llm_model
+        table["model"] = model
+        table["series"] = method if model == "classical" else f"{model}/{method}"
+        frames.append(table)
+        sources.append(dict(path=str(path), sha256=hashlib.sha256(path.read_bytes()).hexdigest()))
+    output = BASE_OUTPUT_DIR / "baselines" / directory.relative_to(BASE_REPLAY_DIR / "baselines")
+    if any(method in LLM_VARIANTS for method in args.methods):
+        output = output / "comparisons" / args.llm_model
+    full = pd.read_csv(LANDSCAPES["full"])
+    load_landscape("full")  # Validate the offline reference before producing figures.
+    baseline_analysis.analyze(frames, full, output, dict(metadata, analysis_sources=sources,
+                                                       full_landscape_sha256=hashlib.sha256(LANDSCAPES["full"].read_bytes()).hexdigest(),
+                                                       requested_replicates=args.replicates,
+                                                       llm_provenance="legacy files; serving settings not recorded"))
+
+
+def build_parser():
+    import llm_client
+
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--methods", nargs="+", choices=METHOD_ORDER, default=["random", "bayesian"])
     parser.add_argument("--replicates", type=int, default=100)
@@ -329,8 +396,43 @@ def main():
     parser.add_argument("--analyze-only", action="store_true")
     parser.add_argument("--llm-model", default=DEFAULT_LLM_MODEL, help="Gateway model id for the LLM methods.")
     parser.add_argument("--max-output-tokens", type=int, default=None,
-                        help="Decision/summary output limit; default 500/400 for the default model, 2000 otherwise.")
+                        help="Responses defaults: 500/400 for default model, 2000 otherwise. Local Chat default: 16384.")
+    parser.add_argument("--seed", type=int, default=1000, help="Base seed; new Chat runs also derive explicit per-request seeds.")
+    llm_client.add_arguments(parser)
+    return parser
+
+
+def main():
+    parser = build_parser()
     args = parser.parse_args()
+    args.methods = list(dict.fromkeys(args.methods))
+    if args.replicates < 1 or args.startup_trials < 1 or args.seed < 0 or args.seed + args.replicates > 2**32:
+        parser.error("Use positive replicates/startup counts and seeds in the uint32 range.")
+    for method in args.methods:
+        limit = len(classical_search.catalogue(method))
+        if not 1 <= args.budget <= limit:
+            parser.error(f"{method} supports budgets from 1 to {limit}.")
+    if args.analysis_inputs:
+        if not args.analyze_only:
+            parser.error("--analysis-inputs requires --analyze-only.")
+        import llm_analysis
+        llm_analysis.run(args, sys.modules[__name__])
+        return
+    if args.llm_api == "chat":
+        if args.analyze_only:
+            parser.error("Use --analysis-inputs with explicit protocol directories for offline Chat analysis.")
+        import llm_replay_io
+        llm_replay_io.run(args, sys.modules[__name__])
+        return
+    if args.smoke_test or args.condition is not None or args.thinking is not None or args.reasoning_effort is not None or args.model_revision is not None or args.context_window is not None or args.decoding_profile != "controlled" or any(
+            value is not None for value in (args.temperature, args.top_p, args.top_k, args.presence_penalty)):
+        parser.error("Local inference controls require --llm-api chat; the original Responses path is unchanged.")
+    if not args.analyze_only and any(method in LLM_VARIANTS for method in args.methods):
+        from llm_client import MODELS
+        if args.llm_model in MODELS:
+            parser.error("New local-model runs require --llm-api chat. Historical local CSVs are read-only.")
+    if args.seed != 1000 and any(method in LLM_VARIANTS for method in args.methods) and not args.analyze_only:
+        parser.error("--seed applies to classical generation; existing LLM seed behaviour is unchanged.")
 
     global REPLAY_DIR, OUTPUT_DIR
     llm_search.LLM_MODEL = summarize_experiment.LLM_MODEL = args.llm_model
@@ -345,6 +447,43 @@ def main():
             parser.error("--llm-model only applies to LLM methods; random/bayesian replays are shared")
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
+    if "tpe_discrete" in args.methods and not args.analyze_only:
+        from tpe_acquisition import require_compatible_version
+        require_compatible_version()
+    classical = [method for method in args.methods if method in classical_search.METHODS]
+    if classical:
+        relative, metadata = baseline_settings(args)
+        directory = BASE_REPLAY_DIR / "baselines" / relative
+        if args.analyze_only:
+            # Never merge implementation versions. Each matching directory gets its own report.
+            pattern = f"budget_{args.budget:03d}_startup_{args.startup_trials:03d}_seed_{args.seed}_p*"
+            matches = sorted((BASE_REPLAY_DIR / "baselines" / args.landscape).glob(pattern))
+            if not matches:
+                if set(args.methods) <= {"random", "bayesian"} and (args.budget, args.startup_trials, args.seed, args.landscape) == (10, 3, 1000, "full"):
+                    # Archive compatibility: read historical CSVs, write analysis to a new location.
+                    OUTPUT_DIR = BASE_OUTPUT_DIR / "baselines" / "legacy"
+                    print("Analysing archived replays; package/startup provenance is unverified.")
+                    analyze()
+                    return
+                raise FileNotFoundError("No baseline outputs match these settings.")
+            for match in matches:
+                stored = json.loads((match / "metadata.json").read_text())
+                expected = (args.budget, args.startup_trials, args.seed, args.landscape)
+                if tuple(stored[k] for k in ("budget", "startup_trials", "base_seed", "landscape")) != expected:
+                    raise ValueError("Directory name and stored settings disagree.")
+                if stored["landscape_sha256"] != metadata["landscape_sha256"]:
+                    raise ValueError("Landscape has changed since this replay; refusing to rescore it.")
+                analyze_baselines(args, match, stored)
+            return
+        print(f"Classical results: {directory}")
+        feedback = load_landscape(args.landscape)
+        for method in classical:
+            baseline_io.run_method(directory, metadata, method, args.replicates, feedback, replay)
+        for method in args.methods:
+            if method in LLM_VARIANTS:
+                run_method(method, args.replicates, args.landscape, args.budget, args.startup_trials)
+        analyze_baselines(args, directory, metadata)
+        return
     if not args.analyze_only:
         for method in args.methods:
             run_method(method, args.replicates, args.landscape, args.budget, args.startup_trials)

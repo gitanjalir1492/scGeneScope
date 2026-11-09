@@ -1,5 +1,203 @@
 # Methods
 
+## Local LLM protocol
+
+[LLM_EXPERIMENTS.md](LLM_EXPERIMENTS.md) declares the new experiment matrix, generation settings,
+reasoning controls, smoke criteria, retry/failure policy, seeds and analysis.
+The client connects to an existing OpenAI-compatible endpoint without managing
+the server. Diagnostic metadata is optional; requested controls, API acceptance
+and independently observed effective settings are recorded separately. Unknown
+revision, reasoning-effort or sampling application is not claimed as verified.
+The primary comparison is optimum discovery within ten evaluations; mean best
+validation accuracy is the key supporting outcome. RF-EI is the principal
+adaptive classical comparator, alongside finite TPE, GP-EI and multimodal diversity.
+Top-three discovery, training GPU-hours, separate inference costs, failure rates
+and offline validation-selected test accuracy/F1 are additional outcomes.
+
+The Qwen3-8B replications are 50 fresh trajectories per prompt, not extensions of
+the archived ten. Local Chat uses the existing user prompts verbatim but a new
+explicitly identified API/serving/reasoning/decoding protocol. The primary
+Qwen3.8 thinking switch uses matched sampling; publisher-recommended non-thinking
+decoding is a separate secondary condition. Technical smoke validation includes
+the complete ten-evaluation trajectory and never gates on search performance.
+Failed trajectories are retained in the primary discovery denominator. Test
+results are accessible only to offline analysis. The classical protocol below
+and the archived Responses clients are unchanged.
+
+Local results use readable model/landscape/budget/seed/reasoning/decoding paths.
+Full protocol fingerprints remain enforced through metadata: incompatible
+settings at the same path produce a field-level error before generation, and
+require a separately named condition plus fresh smoke. The revised seed scheme
+is documented in [LLM_EXPERIMENTS.md](LLM_EXPERIMENTS.md); older hash-directory
+smokes remain isolated. The successful readable-directory smokes already use
+the current execution protocol and can extend to production. The optional
+`replay_with_report.py` launcher runs that unchanged, fully fingerprinted
+execution entry point before offline reporting; reporting-source hashes are
+audited separately and do not define a scientific condition. Completed checkpoints are reused
+explicitly and never regenerated. Final estimates and intervals are withheld
+until every requested trajectory is completed or terminally failed; failures
+remain in primary discovery and compute-curve denominators. See
+[LLM_AUDIT.md](LLM_AUDIT.md) for the final audit and handover.
+
+## Extended full-landscape classical comparison
+
+This section defines the new classical replay protocol. Later sections document
+the historical pilot and LLM experiments; their references to future training
+do not apply to this comparison. No further training or datasets are required.
+
+All feedback comes from the fixed 51-configuration landscape. A selected
+configuration consumes one evaluation; duplicates are prohibited. Proposers
+receive architectural descriptions and completed validation feedback only.
+New selectors cannot read result files and are not passed the evaluator or any
+test scores, global ranks, unobserved scores or measured unobserved costs.
+Feedback retains the existing six-decimal validation precision.
+
+### Random and structural policies
+
+`random` preserves the original sampler and its seeded budget-sized sample.
+`stratified_random` shuffles each family's configurations and selects one from
+each nonempty family in a newly shuffled family order each round. At budget ten
+this gives a random 4/3/3 allocation. Exhausted families are skipped.
+
+`multimodal_random` uses a seeded uniform permutation of the 36 multimodal
+configurations. `multimodal_diverse` chooses its first configuration uniformly,
+then maximises minimum categorical distance to the selected set, with seeded
+tie-breaking. Its four equally weighted decisions are RNA encoder, image
+encoder, profile/aggregation and fusion. It never uses observed score values.
+Neither method preferentially ranks component values or uses trial-position
+rules. Both deliberately restrict eligibility and reject budgets above 36.
+
+For uniform sampling of b configurations from N with K targets, the exact hit
+probability is `1 - comb(N-K, b)/comb(N, b)`. At b=10, unrestricted random finds
+the unique optimum with probability 10/51 and a top-three configuration with
+probability 0.488115. Multimodal random uses N=36 and only targets inside its
+subset; an optimum outside that subset has zero discovery probability.
+
+### Original and repaired hierarchical TPE
+
+`bayesian` is unchanged. Initially it weights the three families equally and
+single/multi-profile equally, so it is not uniform over the 51 configurations.
+It records rejected duplicates as PRUNED; Optuna includes these in startup
+accounting and density fitting. Its historical study reconstruction and fixed
+reseeding are preserved. It can still fail after its original retry limit.
+
+The repaired variants reuse the exact conditional parameterisation, independent
+Optuna TPE, sampler defaults, and reconstruction/reseeding convention. Rejected
+proposals are closed as FAIL, excluded from TPE's observations. Only genuine
+completed evaluations count towards startup. `tpe_repaired_hierarchical` keeps
+the original hierarchical random prior. `tpe_repaired_uniform` supplies uniform
+configuration startup, recorded in the original hierarchical parameterisation.
+
+After 255 rejected proposals the repaired variants draw uniformly from the
+remaining configurations. This produces one evaluation, not 255, and the actual
+feedback is available to the next selection. `proposal_attempts` and `fallback`
+are logged. Rejection no longer penalises duplicates in the density model, so
+fallback can be frequent and its rate is part of the interpretation.
+
+### Finite TPE and structural encoding
+
+New surrogates use five categorical blocks: family, RNA encoder, image encoder,
+profile/aggregation, fusion. Inactive encoders/fusion have a separate category.
+Profile/aggregation has three choices (single, multi-average, multi-Transformer).
+This avoids double-counting the profile decision. Numbered IDs are never model
+features. The one-hot form has 16 columns, scaled by 1/sqrt(2), so one block
+mismatch contributes one squared-distance unit. Fitting uses observed targets
+only; constructing structural features for all candidates does not expose scores.
+
+`tpe_discrete` fits multivariate categorical mixture densities using Optuna 4.9.0
+and evaluates `log l(x) - log g(x)` over every remaining valid configuration.
+Good-group size and chronological weights follow that version's default TPE;
+at the main budget this means one elite observation. The prior and categorical
+smoothing are Optuna's. Selection is an exhaustive maximum with seeded ties.
+The density estimator's private API is isolated in `tpe_acquisition.py`, which
+rejects other Optuna versions. A flat opaque categorical ID would leave all unseen
+IDs exchangeable and is intentionally not used. This method changes representation,
+joint modelling and acquisition optimisation, not just startup distribution.
+
+### GP and RF acquisition
+
+`gp_ei` fits ConstantKernel times Matérn (nu=2.5), with one shared length scale.
+Initial amplitude/length are 1; bounds are [1e-3, 1e3] and [0.1, 10]. Targets are
+normalised from observed data only. Three seeded optimisation restarts are used.
+Jitter starts at 1e-8, then 1e-6 and 1e-4 on numerical failure; the used value is
+recorded. Failure at all levels raises an error rather than silently switching
+to random search. A large ARD parameterisation is avoided with such little data.
+
+`rf_ei` retrains 256 bootstrap regression trees each step, with max_features=1.0,
+min_samples_leaf=1, otherwise standard sklearn defaults, and one fitting thread.
+Predictive mean and sample standard deviation (ddof=1) are computed over tree
+predictions. This deviation is not divided by sqrt(number of trees). Gaussian
+moment-matched EI is an approximation, not a calibrated Bayesian posterior or
+the complete SMAC algorithm. Averaging individual-tree positive improvements
+would be degenerate because tree predictions cannot exceed the observed maximum.
+
+Both use maximisation EI with zero exploration offset:
+`EI = (mu-best)*Phi(z) + sigma*phi(z)`, `z=(mu-best)/sigma`.
+Zero variance uses the exact limit `max(mu-best, 0)`. Only unobserved valid
+candidates are scored. If every EI underflows to zero, maximum predictive
+standard deviation is used, followed by seeded ties. When only one eligible
+candidate remains, it is selected directly without unnecessary model fitting.
+
+### Initialisation, seeds and scope
+
+Primary comparisons use natural starts, with three startup evaluations for the
+new Bayesian methods, counted within budget. Uniform-start methods share a
+seeded catalogue-permutation prefix. Startup counts 1 and 5 are prespecified
+sensitivities; counts at or above budget leave no adaptive phase. Original TPE's
+nominal startup count does not guarantee that many distinct random evaluations.
+Matched-start comparisons are a separate protocol; LLM integration is deferred.
+
+Replicate r uses base_seed+r (default base 1000). Proposal tie-breaking uses local
+seed streams; GP/RF fitting seeds depend on base replicate seed and observation
+count. Method order cannot affect selections. Python and numerical package
+versions are part of the saved protocol identity. Existing LLM API sampling is
+not controlled by the local seed; prompts/responses remain its audit record.
+The CLI still defaults to 100 replicates. The planned classical comparison uses
+explicit `--replicates 1000`.
+
+### Saving and offline analysis
+
+New classical results use settings-derived directories below
+`results/lookup_replays/baselines/`, with one CSV per method and a compact
+metadata sidecar. Selection code, landscape, settings and dependency identities
+prevent incompatible data from sharing a directory. Replicate count is not an
+identity field. Existing complete replicates are checked and reused, missing
+IDs are appended atomically, and lowering the request never truncates files.
+Malformed partial CSV trajectories fail closed; an interrupted in-memory
+replicate can be rerun. Historical root/model results are never adopted as new
+baseline output files. See README for exact commands and paths.
+
+Analysis reports best full-validation accuracy, simple regret, tie-inclusive
+optimum/top-three hits and cumulative recorded single-GPU training time. Accuracy,
+regret, cost and validation-selected-incumbent test metrics receive pointwise
+95% percentile bootstrap intervals (2,000 whole-trajectory resamples). Discovery
+probabilities receive Wilson intervals, including nonzero uncertainty at 0/N
+and N/N. These are pointwise intervals, not simultaneous confidence bands.
+
+Compute curves evaluate each trajectory's right-continuous incumbent at 101
+common cost thresholds. No result is available before its first completed
+evaluation; coverage is reported and mean accuracy is omitted until all
+trajectories in that series have an incumbent. Final incumbents persist after
+the evaluation budget is spent. These are compute-truncated fixed-evaluation
+policies, not policies optimised for a cost budget. Training GPU-hours exclude
+optimiser and LLM inference costs.
+
+The test incumbent is selected by observed validation accuracy, with earliest
+selection breaking ties. Only then are test metrics joined offline. Test curves
+may decrease as validation improves; taking the best observed test score would
+introduce test-based selection and is not done. Proxy replay support is retained:
+full-validation discovery and cost remain the offline scoring reference, but
+incumbent selection still uses the feedback the optimiser actually observed.
+
+Analyses never pool settings, implementation fingerprints or different LLM
+models. Equal replicate numbers alone do not establish pairing. Startup-insensitive
+methods copied across sensitivity directories and overlapping seed ranges must
+not be counted as independent new trajectories. Existing LLM files have incomplete
+serving/token provenance, which is explicitly labelled in comparison metadata.
+All uncertainty is conditional on this one fixed seed-42 training landscape;
+it does not measure training, dataset or cross-task uncertainty. Baseline design
+and sensitivities must be frozen before evaluating their performance.
+
 ## Overview
 
 I compare four ways of choosing model configurations in scGeneScope: random search, Bayesian optimization, LLM-guided search using validation metrics, and LLM-guided search using validation metrics plus experiment summaries.
