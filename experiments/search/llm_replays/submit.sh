@@ -2,6 +2,7 @@
 # Submit Astra + Opus lookup replays (7 prompting conditions each) as one SLURM array.
 # Resumes from saved replicates in results/lookup_replays/models/<model>/<method>.csv.
 #   REPLICATES=50 ./submit.sh
+#   SCRIPT=unpaired_history.py ./submit.sh   # unpaired-history control
 set -euo pipefail
 cd "$(dirname "$0")"
 
